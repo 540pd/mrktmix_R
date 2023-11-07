@@ -1,0 +1,21 @@
+Package: mrktmix
+Title: Market Mix Modeling
+Version: 0.0.0.1
+Date: 2023-10-22
+Depends: R (>= 3.1)
+Imports: dplyr, purrr, stringr, car, magrittr, tidyselect, tibble, tidyr, rlang, pbapply
+Authors@R: 
+    person("Abhimanyu", "Mahato", , "abhimanyu.mahato@gmail.com", role = c("aut", "cre"))
+Description: Market Mix Modeling (MMM) is a statistical analysis method in marketing that assesses the impact of factors like advertising, pricing, and promotions on product or service performance. The package contains supporting function for MMM.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+URL: https://github.com/540pd/mrktmixR
+LazyData: true
+Suggests: 
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+VignetteBuilder: knitr
+Config/testthat/edition: 3
