@@ -72,7 +72,7 @@ assemble_base_models <- function(candidate_predictors, model_indep_df, model_dep
   # ) %>%
   #   dplyr::bind_cols(sum = sapply(model_df_apl, sum, na.rm = TRUE))
   candidate_predictors_unlist<-unlist(candidate_predictors,recursive=F)
-  dplyr::bind_rows(candidate_predictors_unlist) %>%
+  independent_variable_info <- dplyr::bind_rows(candidate_predictors_unlist) %>%
     dplyr::mutate(var=names(candidate_predictors_unlist))%>%
     tidyr::separate(var, c("type", "variable"), sep = "\\.", extra = "merge") %>%
     dplyr::bind_cols(sum = sapply(model_df_apl, sum, na.rm = TRUE))
