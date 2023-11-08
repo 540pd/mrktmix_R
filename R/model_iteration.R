@@ -59,19 +59,26 @@ assemble_base_models <- function(candidate_predictors, model_indep_df, model_dep
                                  drop_pvalue_precision = 2, discard_estimate_sign = TRUE, drop_highest_estimate = FALSE,
                                  get_model_object = FALSE) {
   # Apply the 'apl' function on independent variables and replace NA with zero
-  model_df_apl <- apply_apl(model_indep_df, c(candidate_predictors[[1]], candidate_predictors[[2]]))
+  # model_df_apl <- apply_apl(model_indep_df, c(candidate_predictors[[1]], candidate_predictors[[2]]))
+  model_df_apl <- apply_apl(model_indep_df, unlist(unname(candidate_predictors), recursive = F))
   model_df_apl[is.na(model_df_apl)] <- 0
 
   # Combine predictors info and calculate sum ignoring NA
-  independent_variable_info <- dplyr::bind_rows(
-    dplyr::bind_rows(candidate_predictors[[1]], .id = "variable") %>%
-      dplyr::mutate(type = names(candidate_predictors[1])),
-    dplyr::bind_rows(candidate_predictors[[2]], .id = "variable") %>%
-      dplyr::mutate(type = names(candidate_predictors[2]))
-  ) %>%
+  # independent_variable_info <- dplyr::bind_rows(
+  #   dplyr::bind_rows(candidate_predictors[[1]], .id = "variable") %>%
+  #     dplyr::mutate(type = names(candidate_predictors[1])),
+  #   dplyr::bind_rows(candidate_predictors[[2]], .id = "variable") %>%
+  #     dplyr::mutate(type = names(candidate_predictors[2]))
+  # ) %>%
+  #   dplyr::bind_cols(sum = sapply(model_df_apl, sum, na.rm = TRUE))
+  candidate_predictors_unlist<-unlist(candidate_predictors,recursive=F)
+  dplyr::bind_rows(candidate_predictors_unlist) %>%
+    dplyr::mutate(var=names(candidate_predictors_unlist))%>%
+    tidyr::separate(var, c("type", "variable"), sep = "\\.", extra = "merge") %>%
     dplyr::bind_cols(sum = sapply(model_df_apl, sum, na.rm = TRUE))
   # %>%
   #   bind_rows(data.frame(variable = "(Intercept)", sum = nrow(model_df_apl), type = "intercept"))
+
 
   # Add intercept info if necessary
   if (with_intercept) {
