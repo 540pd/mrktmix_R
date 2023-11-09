@@ -145,6 +145,47 @@ compose_variable_apl <- function(variables_wt_named_apl, apl_delimiter = "_", de
   unname(unlist(result))
 }
 
+#' Parse Variable with Adstock, Power, and Lag
+#'
+#' This function parses a vector of strings containing variable information along with adstock, power, and lag, separated by specified delimiters.
+#' Each string should contain variable names and up to three numeric values (adstock, power, and lag) in a consistent order, separated by delimiters.
+#'
+#' @param variables_wt_apl A character vector with each element containing variable names and up to three numeric values separated by `delimeter` and `apl_delimeter`.
+#' @param apl_delimeter A string representing the delimiter between adstock, power, and lag values.
+#' @param delimeter A string representing the main delimiter between variable and apl in the variables_wt_apl strings.
+#' @return A data frame containing variables and their corresponding adstock, power, and lag values.
+#' @examples
+#' \dontrun{
+#' parse_variable_wt_apl(c("TV_Smart|0.8_0.22_0.11", "Radio|0.5_0.15"), "_", "|")
+#' }
+#' @importFrom stats na.omit
+#' @export
+parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimiter = "|") {
+  # check acceptable pattern
+  if(sum(!stringr::str_detect(variables_wt_apl, paste0(fixed(delimiter),"\\d+(\\.\\d+)?",fixed(apl_delimiter),"\\d+(\\.\\d+)?",fixed(apl_delimiter),"\\d+(\\.\\d+)?$")))){
+    stop(paste("Please ensure that all variable with apl should be followed by",delimiter,"then followed by adstock, power and lag, each separated by an underscore",apl_delimiter))
+  }
+
+  # Escape the special characters in regular expression
+  escaped_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", delimiter)
+  escaped_apl_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", apl_delimiter)
+
+  regex_pattern <- paste0("(.+?)", escaped_delimiter, "([0-9.]+", escaped_apl_delimiter, "?[0-9.]*", escaped_apl_delimiter, "?[0-9.]*)$")
+
+  matches <- stringr::str_match(variables_wt_apl, regex_pattern)
+
+  if (any(is.na(matches))) {
+    warning("Some inputs did not match the expected format and will be omitted.")
+    matches <- na.omit(matches)
+  }
+
+  data.frame(
+    variable = matches[, 2],
+    adstock = as.numeric(stringr::str_extract(matches[, 3], "^[0-9.]+")),
+    power = as.numeric(stringr::str_extract(stringr::str_replace(matches[, 3], "^[0-9.]+_", ""), "^[0-9.]+")),
+    lag = as.numeric(stringr::str_extract(matches[, 3], "[0-9.]+$"))
+  )
+}
 #' Generate Model-Dependent Data Frames with APL Transformations
 #'
 #' Applies Adstock-Power-Lag (APL) transformations to variable information within
