@@ -10,17 +10,17 @@
 #'
 #' @examples
 #' \dontrun{
-#'   aggregate_columns(advertising, c("Sales", "TV|Radio|Newspaper"), delimeter = "\\|")
+#'   aggregate_columns(advertising, c("Sales", "TV|Radio|Newspaper"), delimeter = "|")
 #' }
 #'
 #' @export
-aggregate_columns <- function(modeling_df, aggregated_variables, delimeter = "\\|") {
-  individual_variables <- stringr::str_split(aggregated_variables, delimeter)
+aggregate_columns <- function(modeling_df, aggregated_variables, delimeter = "|") {
+  individual_variables <- stringr::str_split(aggregated_variables, fixed(delimeter))
   aggregated_vals <- lapply(individual_variables, function(x) apply(modeling_df[, x, drop = FALSE], 1, sum, na.rm = TRUE))
   aggregated_df <- as.data.frame(do.call(cbind, stats::setNames(aggregated_vals, aggregated_variables)))
   return(aggregated_df)
 }
-
+                            
 #' Decompose Model Component with Adstock, Power, and Lag (APL) Transformations
 #'
 #' This function takes a set of variables with weights and applies Adstock, Power,
