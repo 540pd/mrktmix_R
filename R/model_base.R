@@ -43,8 +43,8 @@ determine_pvalue_flag <- function(type, pvalue, pvalue_thresholds) {
 #'
 #' @return Logical; TRUE if the variable is expected to have a positive sign, FALSE if expected to have a negative sign, NA otherwise.
 determine_expected_sign <- function(variable, pos_vars, neg_vars, var_agg_delimiter) {
-  expected_pos <- lapply(str_split(variable, var_agg_delimiter), `%in%`, pos_vars)
-  expected_neg <- lapply(str_split(variable, var_agg_delimiter), `%in%`, neg_vars)
+  expected_pos <- lapply(stringr::str_split(variable, var_agg_delimiter), `%in%`, pos_vars)
+  expected_neg <- lapply(stringr::str_split(variable, var_agg_delimiter), `%in%`, neg_vars)
 
   dplyr::if_else(
     unlist(lapply(expected_pos, all)), TRUE,
@@ -370,7 +370,6 @@ get_base_model <- function(lm_model, model_data, independent_var_info, pos_vars,
   repeat {
     # Get summary of the current model
     lm_model_smry <- summary(lm_model)
-
     # Determine coefficients and flags
     model_coef <- independent_var_info %>%
       dplyr::right_join(
@@ -386,7 +385,7 @@ get_base_model <- function(lm_model, model_data, independent_var_info, pos_vars,
         flag_sign = (.data$Estimate > 0) != .data$expected_sign,
         flag_vif = determine_vif_flag(.data$type, .data$vif, vif_threshold)
       ) %>%
-      dplyr::select(-.data$expected_sign)
+      dplyr::select(-"expected_sign")
 
     # Accumulate results
     model_coef_all <- dplyr::bind_rows(model_coef_all, model_coef)
