@@ -267,3 +267,62 @@ generate_model_dependent <- function(var_info, model_df,
 
   list(var_apl_info, apl_df_list)
 }
+
+#' Get Dependent and Independent Variables
+#'
+#' This function determines the type of a model based on the presence of characters + and -,
+#' and processes the model variable accordingly to extract dependent and independent variables.
+#'
+#' @param model_variable A character string representing the model variable.
+#' @param var_agg_delimiter A character string representing the delimiter for aggregated variables. Default is "|".
+#' @param print_model_type A logical indicating whether to print the determined model type. Default is TRUE.
+#'
+#' @return A list containing the processed dependent and independent variables.
+#'
+#' @examples
+#' \dontrun{
+#' get_dep_indep_vars("A + B - C")
+#' }
+get_dep_indep_vars <- function(model_variable, var_agg_delimiter = "|", print_model_type = TRUE) {
+  # Determine model type based on the presence of characters + and -
+  model_type <- if (!str_detect(model_variable, "[+-]")) {
+    "Remodel"
+  } else if (str_detect(model_variable, "\\+") & str_detect(model_variable, "-")) {
+    "Aggregate & Segregate"
+  } else if (str_detect(model_variable, "-")) {
+    "Segregate"
+  } else if (str_detect(model_variable, "\\+")) {
+    "Aggregate"
+  }
+
+  remodel <- !str_detect(model_variable, "[+-]")
+  regroup_split <- str_detect(model_variable, "\\+") & str_detect(model_variable, "-")
+  split <- str_detect(model_variable, "-")
+  regroup <- str_detect(model_variable, "\\+")
+
+  # Print the determined model type if requested
+  if (print_model_type) {
+    cat("Model Type:", model_type, "\n")
+  }
+
+  # Initialize variables for dependent and independent variables
+  dep_var_rel <- indep_vars <- character()
+
+  # Based on the model type, process the model variable
+  if (model_type == "Remodel") {
+    dep_var_rel <- model_variable
+    indep_vars <- model_variable
+  } else if (model_type == "Aggregate") {
+    dep_var_rel <- unlist(str_split(model_variable, "\\+"))
+    indep_vars <- str_replace_all(model_variable, "\\+", var_agg_delimiter)
+  } else if (model_type == "Aggregate & Segregate") {
+    dep_var_rel <- str_replace_all(str_replace(unlist(str_split(model_variable, "\\+")), paste0("^-",var_agg_delimiter,"-$"), ""), "-", var_agg_delimiter)
+    indep_vars <- str_replace_all(str_replace(unlist(str_split(model_variable, "-")), paste0("^\\+",var_agg_delimiter,"\\+$"), ""), "\\+", var_agg_delimiter)
+  } else if (model_type == "Segregate") {
+    dep_var_rel <- str_replace_all(model_variable, "-", var_agg_delimiter)
+    indep_vars <- unlist(str_split(model_variable, "-"))
+  }
+
+  # Return a list containing the processed dependent and independent variables
+  return(list(dependent_var = dep_var_rel, independent_var = indep_vars))
+}
