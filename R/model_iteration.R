@@ -74,7 +74,7 @@ assemble_base_models <- function(candidate_predictors, model_indep_df, model_dep
   candidate_predictors_unlist<-unlist(candidate_predictors,recursive=F)
   independent_variable_info <- dplyr::bind_rows(candidate_predictors_unlist) %>%
     dplyr::mutate(var=names(candidate_predictors_unlist))%>%
-    tidyr::separate(var, c("type", "variable"), sep = "\\.", extra = "merge") %>%
+    tidyr::separate("var", c("type", "variable"), sep = "\\.", extra = "merge") %>%
     dplyr::bind_cols(sum = sapply(model_df_apl, sum, na.rm = TRUE))
   # %>%
   #   bind_rows(data.frame(variable = "(Intercept)", sum = nrow(model_df_apl), type = "intercept"))
@@ -117,6 +117,7 @@ assemble_base_models <- function(candidate_predictors, model_indep_df, model_dep
 #'   sign in the model.
 #' @param neg_sign_variables A vector of variable names expected to have a negative
 #'   sign in the model.
+#' @param base_variables A vector of variable names representing base. Its coefficient will be 1.
 #' @return A list containing the collated base models and associated statistics.
 #' @importFrom purrr map_dfr
 #'
@@ -138,8 +139,8 @@ assemble_base_models <- function(candidate_predictors, model_indep_df, model_dep
 #'   )
 #' }
 collate_base_models <- function(candidate_variables_list, model_df, model_dep_df,
+                                pos_sign_variables, neg_sign_variables,  base_variables = NA,
                                 with_intercept = TRUE,
-                                pos_sign_variables, neg_sign_variables ,
                                 var_agg_delimiter = "\\|", run_up_to_flexi_vars = 0,
                                 vif_threshold = 10, pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
                                 drop_pvalue_precision = 2, discard_estimate_sign = TRUE, drop_highest_estimate = FALSE,
@@ -150,8 +151,19 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
   stopifnot(is.data.frame(model_dep_df))
 
   dependent_sum <- sum(model_dep_df$Y)
+
+  if(any(!is.na(base_variables))){
+    base_data<-model_df %>%
+      dplyr::select(tidyselect::all_of(base_variables))
+    model_dep_df_modified<-model_dep_df %>%
+      dplyr::transmute(Y = .data$Y-rowSums(base_data))
+  } else {
+    base_data<-NA
+    model_dep_df_modified<-model_dep_df
+  }
+
   base_models <- purrr::map(candidate_variables_list, ~assemble_base_models(
-    .x, model_df, model_dep_df,
+    .x, model_df, model_dep_df_modified,
     pos_sign_variables, neg_sign_variables,
     with_intercept,
     var_agg_delimiter, run_up_to_flexi_vars,
@@ -160,7 +172,22 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
     get_model_object
   ))
 
-  model_coef_all <- purrr::map_dfr(base_models, 1, .id = "model_id") %>%
+  model_coef_all <- purrr::map_dfr(base_models, 1, .id = "model_id")
+
+  if(any(!is.na(base_variables))){
+    model_coef_all <- model_coef_all %>%
+      dplyr::bind_rows(t(as.data.frame(base_data %>%
+                                         dplyr::summarise(across(everything(), sum))))%>%
+                         as.data.frame() %>%
+                         tibble::as_tibble(rownames = "variable") %>%
+                         dplyr::rename(sum="V1") %>%
+                         dplyr::mutate(Estimate = 1, type = "offset") %>%
+                         dplyr::cross_join(model_coef_all %>%
+                                             dplyr::select(tidyselect::all_of(c("model_id","loop_id"))) %>%
+                                             dplyr::distinct())
+      )
+  }
+  model_coef_all <- model_coef_all %>%
     dplyr::mutate(dep_sum = dependent_sum)
 
   model_smry_all<-purrr::map_dfr(base_models, 2, .id = "model_id") %>%
@@ -220,8 +247,9 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
 #'   )
 #' }
 collate_models<-function(candidate_variables_list, model_df, dep_var_info,
-                         with_intercept = TRUE, mdl_start_date=NA, mdl_end_date=NA,
                          pos_sign_variables, neg_sign_variables,
+                         mdl_start_date=NA, mdl_end_date=NA,
+                         base_variables = NA, with_intercept = TRUE,
                          var_agg_delimiter = "\\|",apl_delimiter = "_",var_apl_delimiter = "\\|",
                          run_up_to_flexi_vars = 100,
                          vif_threshold = 10, pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
@@ -239,8 +267,8 @@ collate_models<-function(candidate_variables_list, model_df, dep_var_info,
   }
 
   model_result <- purrr::map(dep_apl_df_list[[2]],~collate_base_models(candidate_variables_list,  model_df, .x %>% dplyr::rename(Y = names(.x)[1]),
-                                                                       with_intercept ,
                                                                        pos_sign_variables , neg_sign_variables ,
+                                                                       base_variables, with_intercept,
                                                                        var_agg_delimiter , run_up_to_flexi_vars,
                                                                        vif_threshold, pvalue_thresholds,
                                                                        drop_pvalue_precision, discard_estimate_sign, drop_highest_estimate,
