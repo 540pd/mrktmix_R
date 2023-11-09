@@ -49,7 +49,7 @@ aggregate_columns <- function(modeling_df, aggregated_variables, delimeter = "|"
 #'   transformed_df <- decompose_model_component(variables_wt_weights, model_df,
 #'                                               is_weight_coefficient = FALSE,
 #'                                               apl_delimiter = "_",
-#'                                               delimiter = "\\|")
+#'                                               delimiter = "|")
 #' }
 #' @importFrom dplyr mutate across any_of bind_cols select if_else cur_column
 #' @importFrom purrr pmap
@@ -61,7 +61,8 @@ aggregate_columns <- function(modeling_df, aggregated_variables, delimeter = "|"
 decompose_model_component <- function(variables_wt_weights, model_df,
                                       is_weight_coefficient = TRUE,
                                       apl_delimiter = "_",
-                                      delimiter = "\\|") {
+                                      delimiter = "|") {
+                                        
   # Treat weights as coefficients if is_weight_coefficient is TRUE, otherwise as contributions
   # Select and weight the variables in the model dataframe
   model_df_selected <- model_df %>%
@@ -90,9 +91,13 @@ decompose_model_component <- function(variables_wt_weights, model_df,
     setNames(variable_info$variable)
 
   # Clean variable names by removing APL-related patterns
-  pattern_to_remove <- paste0(delimiter, "([0-9]+(?:\\.[0-9]*)?",
-                              apl_delimiter, "[0-9]+(?:\\.[0-9]*)?",
-                              apl_delimiter, "[0-9]+(?:\\.[0-9]*)?)$")
+  # Escape the special characters in regular expression
+  escaped_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", delimiter)
+  escaped_apl_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", apl_delimiter)
+  pattern_to_remove <- paste0(escaped_delimiter, "([0-9]+(?:\\.[0-9]*)?",
+                              escaped_apl_delimiter, "[0-9]+(?:\\.[0-9]*)?",
+                              escaped_apl_delimiter, "[0-9]+(?:\\.[0-9]*)?)$")
+
   names(variables_wt_weights) <- str_replace(names(variables_wt_weights), pattern_to_remove, "")
 
   # Apply APL transformations and recombine with the selected data
@@ -186,6 +191,7 @@ parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimit
     lag = as.numeric(stringr::str_extract(matches[, 3], "[0-9.]+$"))
   )
 }
+                            
 #' Generate Model-Dependent Data Frames with APL Transformations
 #'
 #' Applies Adstock-Power-Lag (APL) transformations to variable information within
@@ -228,7 +234,6 @@ parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimit
 #' @importFrom purrr flatten
 #' @importFrom tibble enframe as_tibble
 #' @importFrom tidyr unnest_wider
-#'
 generate_model_dependent <- function(var_info, model_df,
                                      apl_delimiter = "_",
                                      delimiter = "\\|") {
