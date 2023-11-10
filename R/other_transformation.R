@@ -114,10 +114,6 @@ if(length(variables_wt_weights_left)){
   return(model_df_combined)
 }
 
-# Return the final model dataframe with applied transformations
-  return(model_df_combined)
-}
-
 #' Compose Variable Names with Adstock, Power, and Lag (APL) Attributes
 #'
 #' This function takes a list of variables with their corresponding Adstock, Power, and Lag (APL)
