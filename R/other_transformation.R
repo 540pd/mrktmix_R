@@ -15,12 +15,12 @@
 #'
 #' @export
 aggregate_columns <- function(modeling_df, aggregated_variables, delimeter = "|") {
-  individual_variables <- stringr::str_split(aggregated_variables, fixed(delimeter))
+  individual_variables <- stringr::str_split(aggregated_variables, stringr::fixed(delimeter))
   aggregated_vals <- lapply(individual_variables, function(x) apply(modeling_df[, x, drop = FALSE], 1, sum, na.rm = TRUE))
   aggregated_df <- as.data.frame(do.call(cbind, stats::setNames(aggregated_vals, aggregated_variables)))
   return(aggregated_df)
 }
-                            
+
 #' Decompose Model Component with Adstock, Power, and Lag (APL) Transformations
 #'
 #' This function takes a set of variables with weights and applies Adstock, Power,
@@ -62,7 +62,7 @@ decompose_model_component <- function(variables_wt_weights, model_df,
                                       is_weight_coefficient = TRUE,
                                       apl_delimiter = "_",
                                       delimiter = "|") {
-                                        
+
   # Treat weights as coefficients if is_weight_coefficient is TRUE, otherwise as contributions
   # Select and weight the variables in the model dataframe
   model_df_selected <- model_df %>%
@@ -156,8 +156,8 @@ compose_variable_apl <- function(variables_wt_named_apl, apl_delimiter = "_", de
 #' Each string should contain variable names and up to three numeric values (adstock, power, and lag) in a consistent order, separated by delimiters.
 #'
 #' @param variables_wt_apl A character vector with each element containing variable names and up to three numeric values separated by `delimeter` and `apl_delimeter`.
-#' @param apl_delimeter A string representing the delimiter between adstock, power, and lag values.
-#' @param delimeter A string representing the main delimiter between variable and apl in the variables_wt_apl strings.
+#' @param apl_delimiter A string representing the delimiter between adstock, power, and lag values.
+#' @param delimiter A string representing the main delimiter between variable and apl in the variables_wt_apl strings.
 #' @return A data frame containing variables and their corresponding adstock, power, and lag values.
 #' @examples
 #' \dontrun{
@@ -167,7 +167,7 @@ compose_variable_apl <- function(variables_wt_named_apl, apl_delimiter = "_", de
 #' @export
 parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimiter = "|") {
   # check acceptable pattern
-  if(sum(!stringr::str_detect(variables_wt_apl, paste0(fixed(delimiter),"\\d+(\\.\\d+)?",fixed(apl_delimiter),"\\d+(\\.\\d+)?",fixed(apl_delimiter),"\\d+(\\.\\d+)?$")))){
+  if(sum(!stringr::str_detect(variables_wt_apl, paste0(stringr::fixed(delimiter),"\\d+(\\.\\d+)?",stringr::fixed(apl_delimiter),"\\d+(\\.\\d+)?",stringr::fixed(apl_delimiter),"\\d+(\\.\\d+)?$")))){
     stop(paste("Please ensure that all variable with apl should be followed by",delimiter,"then followed by adstock, power and lag, each separated by an underscore",apl_delimiter))
   }
 
@@ -191,7 +191,7 @@ parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimit
     lag = as.numeric(stringr::str_extract(matches[, 3], "[0-9.]+$"))
   )
 }
-                            
+
 #' Generate Model-Dependent Data Frames with APL Transformations
 #'
 #' Applies Adstock-Power-Lag (APL) transformations to variable information within
@@ -275,30 +275,26 @@ generate_model_dependent <- function(var_info, model_df,
 #'
 #' @param model_variable A character string representing the model variable.
 #' @param var_agg_delimiter A character string representing the delimiter for aggregated variables. Default is "|".
+#' @param trim A logical indicating whether to trim output or not. Default is TRUE.
 #' @param print_model_type A logical indicating whether to print the determined model type. Default is TRUE.
 #'
 #' @return A list containing the processed dependent and independent variables.
-#'
 #' @examples
 #' \dontrun{
 #' get_dep_indep_vars("A + B - C")
 #' }
-get_dep_indep_vars <- function(model_variable, var_agg_delimiter = "|", print_model_type = TRUE) {
+#' @export
+get_dep_indep_vars <- function(model_variable, var_agg_delimiter = "|", trim = TRUE, print_model_type = TRUE) {
   # Determine model type based on the presence of characters + and -
-  model_type <- if (!str_detect(model_variable, "[+-]")) {
+  model_type <- if (!stringr::str_detect(model_variable, "[+-]")) {
     "Remodel"
-  } else if (str_detect(model_variable, "\\+") & str_detect(model_variable, "-")) {
+  } else if (stringr::str_detect(model_variable, "\\+") & stringr::str_detect(model_variable, "-")) {
     "Aggregate & Segregate"
-  } else if (str_detect(model_variable, "-")) {
+  } else if (stringr::str_detect(model_variable, "-")) {
     "Segregate"
-  } else if (str_detect(model_variable, "\\+")) {
+  } else if (stringr::str_detect(model_variable, "\\+")) {
     "Aggregate"
   }
-
-  remodel <- !str_detect(model_variable, "[+-]")
-  regroup_split <- str_detect(model_variable, "\\+") & str_detect(model_variable, "-")
-  split <- str_detect(model_variable, "-")
-  regroup <- str_detect(model_variable, "\\+")
 
   # Print the determined model type if requested
   if (print_model_type) {
@@ -314,13 +310,18 @@ get_dep_indep_vars <- function(model_variable, var_agg_delimiter = "|", print_mo
     indep_vars <- model_variable
   } else if (model_type == "Aggregate") {
     dep_var_rel <- unlist(str_split(model_variable, "\\+"))
-    indep_vars <- str_replace_all(model_variable, "\\+", var_agg_delimiter)
+    indep_vars <- stringr::str_replace_all(model_variable, "\\+", var_agg_delimiter)
   } else if (model_type == "Aggregate & Segregate") {
-    dep_var_rel <- str_replace_all(str_replace(unlist(str_split(model_variable, "\\+")), paste0("^-",var_agg_delimiter,"-$"), ""), "-", var_agg_delimiter)
-    indep_vars <- str_replace_all(str_replace(unlist(str_split(model_variable, "-")), paste0("^\\+",var_agg_delimiter,"\\+$"), ""), "\\+", var_agg_delimiter)
+    dep_var_rel <- stringr::str_replace_all(str_replace(unlist(str_split(model_variable, "\\+")), paste0("^-",var_agg_delimiter,"-$"), ""), "-", var_agg_delimiter)
+    indep_vars <- stringr::str_replace_all(str_replace(unlist(str_split(model_variable, "-")), paste0("^\\+",var_agg_delimiter,"\\+$"), ""), "\\+", var_agg_delimiter)
   } else if (model_type == "Segregate") {
-    dep_var_rel <- str_replace_all(model_variable, "-", var_agg_delimiter)
-    indep_vars <- unlist(str_split(model_variable, "-"))
+    dep_var_rel <- stringr::str_replace_all(model_variable, "-", var_agg_delimiter)
+    indep_vars <- unlist(stringr::str_split(model_variable, "-"))
+  }
+
+  if(trim){
+    dep_var_rel<-unlist(lapply(stringr::str_split(dep_var_rel,stringr::fixed(var_agg_delimiter)), function(x) paste0(stringr::str_trim(x, side = c("both")),collapse = var_agg_delimiter)))
+    indep_vars<-unlist(lapply(stringr::str_split(indep_vars,stringr::fixed(var_agg_delimiter)), function(x) paste0(stringr::str_trim(x, side = c("both")),collapse = var_agg_delimiter)))
   }
 
   # Return a list containing the processed dependent and independent variables
