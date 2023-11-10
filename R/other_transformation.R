@@ -165,9 +165,9 @@ compose_variable_apl <- function(variables_wt_named_apl, apl_delimiter = "_", de
 #' @export
 parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimiter = "|") {
   # check acceptable pattern
-  if(sum(!stringr::str_detect(variables_wt_apl, paste0(stringr::fixed(delimiter),"\\d+(\\.\\d+)?",stringr::fixed(apl_delimiter),"\\d+(\\.\\d+)?",stringr::fixed(apl_delimiter),"\\d+(\\.\\d+)?$")))){
-    stop(paste("Please ensure that all variable with apl should be followed by",delimiter,"then followed by adstock, power and lag, each separated by an underscore",apl_delimiter))
-  }
+  # if(sum(!stringr::str_detect(variables_wt_apl, paste0(stringr::fixed(delimiter),"\\d+(\\.\\d+)?",stringr::fixed(apl_delimiter),"\\d+(\\.\\d+)?",stringr::fixed(apl_delimiter),"\\d+(\\.\\d+)?$")))){
+  #   stop(paste("Please ensure that all variable with apl should be followed by",delimiter,"then followed by adstock, power and lag, each separated by an underscore",apl_delimiter))
+  # }
 
   # Escape the special characters in regular expression
   escaped_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", delimiter)
