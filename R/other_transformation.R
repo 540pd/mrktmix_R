@@ -62,9 +62,9 @@ decompose_model_component <- function(variables_wt_weights, model_df,
                                       is_weight_coefficient = TRUE,
                                       apl_delimiter = "_",
                                       delimiter = "|") {
-
   # Treat weights as coefficients if is_weight_coefficient is TRUE, otherwise as contributions
-  # Select and weight the variables in the model dataframe
+
+  # Select and weight the variables in the model dataframe. If variable is already present in data, apl won't be applied.
   model_df_selected <- model_df %>%
     dplyr::mutate(dplyr::across(any_of(names(variables_wt_weights)),
                                 ~ .x * variables_wt_weights[dplyr::cur_column()]),
@@ -82,7 +82,10 @@ decompose_model_component <- function(variables_wt_weights, model_df,
 
   # Parse variables for APL information
   variable_info <- parse_variable_wt_apl(names(variables_wt_weights_left), apl_delimiter, delimiter)
-  variables_wt_weights_left <- setNames(variables_wt_weights_left, variable_info$variable)
+  # update variables_wt_weights names 
+  variables_wt_weights_captured <- variables_wt_weights[!names(variables_wt_weights) %in% names(variables_wt_weights_left)]
+  variables_wt_weights_apl <- setNames(variables_wt_weights_left, variable_info$variable)
+  names(variables_wt_weights)[names(variables_wt_weights) %in% names(variables_wt_weights_left)]<-names(variables_wt_weights_apl)
 
   # Create APL information list using pmap
   apl_info <- purrr::pmap(variable_info, function(variable, adstock, power, lag) {
@@ -90,30 +93,20 @@ decompose_model_component <- function(variables_wt_weights, model_df,
   }) %>%
     setNames(variable_info$variable)
 
-  # Clean variable names by removing APL-related patterns
-  # Escape the special characters in regular expression
-  escaped_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", delimiter)
-  escaped_apl_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", apl_delimiter)
-  pattern_to_remove <- paste0(escaped_delimiter, "([0-9]+(?:\\.[0-9]*)?",
-                              escaped_apl_delimiter, "[0-9]+(?:\\.[0-9]*)?",
-                              escaped_apl_delimiter, "[0-9]+(?:\\.[0-9]*)?)$")
-
-  names(variables_wt_weights) <- str_replace(names(variables_wt_weights), pattern_to_remove, "")
-
   # Apply APL transformations and recombine with the selected data
   model_df_transformed <- apply_apl(model_df, apl_info)
-  model_df_selected <- model_df_selected %>%
+  model_df_combined <- model_df_selected %>%
     dplyr::bind_cols(model_df_transformed) %>%
-    dplyr::select(any_of(names(variables_wt_weights)))
+    dplyr::select(tidyr::all_of(names(variables_wt_weights)))
 
   # Adjust for weight coefficients if not treating as coefficients
   if (!is_weight_coefficient) {
-    model_df_selected <- model_df_selected %>%
+    model_df_combined <- model_df_combined %>%
       dplyr::mutate(dplyr::across(everything(), ~ .x / sum(.x, na.rm = TRUE) * {{variables_wt_weights}}[dplyr::cur_column()]))
   }
 
   # Return the final model dataframe with applied transformations
-  return(model_df_selected)
+  return(model_df_combined)
 }
 
 #' Compose Variable Names with Adstock, Power, and Lag (APL) Attributes
@@ -236,9 +229,8 @@ parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimit
 #' @importFrom tidyr unnest_wider
 generate_model_dependent <- function(var_info, model_df,
                                      apl_delimiter = "_",
-                                     delimiter = "\\|") {
-  # Ensure that var_info is a vector or a list with one element
-  stopifnot(length(var_info) == 1)
+                                     delimiter = "|") {
+                                      browser()
 
   if (is.vector(var_info) && is.numeric(var_info) && all(!is.na(names(var_info)))) {
     # Process named vector
@@ -255,14 +247,14 @@ generate_model_dependent <- function(var_info, model_df,
   } else {
     # Process list
     var_wt_apl <- generate_variable_combination(var_info)
-    apl_df_list <- map(var_wt_apl, ~apply_apl(model_df, .x) %>%
-                         mutate(dplyr::across(everything(), ~replace_na(.x, 0)))
+    apl_df_list <- purrr::map(var_wt_apl, ~apply_apl(model_df, .x) %>%
+                         dplyr::mutate(dplyr::across(everything(), ~tidyr::replace_na(.x, 0)))
     )
     var_apl_info <- var_wt_apl %>%
-      flatten() %>%
-      enframe(name = "variable", value = "named_vector") %>%
-      unnest_wider("named_vector") %>%
-      as_tibble()
+      purrr::flatten() %>%
+      tibble::enframe(name = "variable", value = "named_vector") %>%
+      tidyr::unnest_wider("named_vector") %>%
+      tibble::as_tibble()
   }
 
   list(var_apl_info, apl_df_list)
