@@ -80,6 +80,7 @@ decompose_model_component <- function(variables_wt_weights, model_df,
     variables_wt_weights_left <- variables_wt_weights_left[!intercept_exists]
   }
 
+if(length(variables_wt_weights_left)){
   # Parse variables for APL information
   variable_info <- parse_variable_wt_apl(names(variables_wt_weights_left), apl_delimiter, delimiter)
   # update variables_wt_weights names 
@@ -98,6 +99,10 @@ decompose_model_component <- function(variables_wt_weights, model_df,
   model_df_combined <- model_df_selected %>%
     dplyr::bind_cols(model_df_transformed) %>%
     dplyr::select(tidyr::all_of(names(variables_wt_weights)))
+} else {
+  model_df_combined <- model_df_selected %>%
+    dplyr::select(tidyr::all_of(names(variables_wt_weights)))
+}
 
   # Adjust for weight coefficients if not treating as coefficients
   if (!is_weight_coefficient) {
@@ -106,6 +111,10 @@ decompose_model_component <- function(variables_wt_weights, model_df,
   }
 
   # Return the final model dataframe with applied transformations
+  return(model_df_combined)
+}
+
+# Return the final model dataframe with applied transformations
   return(model_df_combined)
 }
 
@@ -172,6 +181,9 @@ parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimit
 
   matches <- stringr::str_match(variables_wt_apl, regex_pattern)
 
+  if(any(!complete.cases(matches))){
+    matches[!complete.cases(matches),]<-c(variables_wt_apl[!complete.cases(matches)], variables_wt_apl[!complete.cases(matches)], paste(0,1,0,sep=apl_delimiter))
+  }
   if (any(is.na(matches))) {
     warning("Some inputs did not match the expected format and will be omitted.")
     matches <- na.omit(matches)
@@ -200,7 +212,7 @@ parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimit
 #'   transformations are to be applied.
 #' @param apl_delimiter A string delimiter for concatenating variable names with
 #'   their APL attributes when `var_info` is a named numeric vector. Default "_".
-#' @param delimiter A string delimiter for separating variable names from their
+#' @param var_apl_delimiter A string delimiter for separating variable names from their
 #'   APL attributes when `var_info` is a named numeric vector. Default "\\|".
 #'
 #' @return A list containing a tibble of APL information and a list of data
@@ -229,33 +241,46 @@ parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimit
 #' @importFrom tidyr unnest_wider
 generate_model_dependent <- function(var_info, model_df,
                                      apl_delimiter = "_",
-                                     delimiter = "|") {
+                                     var_apl_delimiter = "|", var_agg_delimiter = "|") {
 
   if (is.vector(var_info) && is.numeric(var_info) && all(!is.na(names(var_info)))) {
+
+    # Dependent Data - create aggregation if required
+    vars_in_model_df_logical<-names(var_info) %in%  names(model_df)
+    vars_expected_model_df<-names(var_info)[!vars_in_model_df_logical] %>%
+        parse_variable_wt_apl(apl_delimiter, var_apl_delimiter) %>%
+        dplyr::pull(variable) %>%
+        c(names(var_info)[vars_in_model_df_logical])
+    model_df_rel<-aggregate_columns(model_df, vars_expected_model_df, delimeter = var_agg_delimiter)
+
     # Process named vector
     apl_df_list <- list(
-      decompose_model_component(var_info, model_df,
+      decompose_model_component(var_info, model_df_rel,
                                 is_weight_coefficient = FALSE,
                                 apl_delimiter = apl_delimiter,
-                                delimiter = delimiter
+                                delimiter = var_apl_delimiter
       ) %>%
         dplyr::mutate(dplyr::across(everything(), ~tidyr::replace_na(.x, 0)))
     )
-    var_apl_info <- parse_variable_wt_apl(names(var_info), apl_delimiter, delimiter)
+    var_apl_info <- parse_variable_wt_apl(names(var_info), apl_delimiter, var_apl_delimiter)
 
   } else {
+    # Dependent Data - create aggregation if required
+    vars_in_model_df_logical<-names(var_info) %in%  names(model_df)
+    vars_expected_model_df<- c(names(var_info)[!vars_in_model_df_logical], c(names(var_info)[vars_in_model_df_logical]))
+    model_df_rel<-aggregate_columns(model_df, vars_expected_model_df, delimeter = var_agg_delimiter)
+
     # Process list
     var_wt_apl <- generate_variable_combination(var_info)
-    apl_df_list <- purrr::map(var_wt_apl, ~apply_apl(model_df, .x) %>%
-                         dplyr::mutate(dplyr::across(everything(), ~tidyr::replace_na(.x, 0)))
-    )
+    apl_df_list <- purrr::map(var_wt_apl, ~apply_apl(model_df_rel, .x) %>%
+                         dplyr::mutate(dplyr::across(everything(), ~tidyr::replace_na(.x, 0))))
     var_apl_info <- var_wt_apl %>%
       purrr::flatten() %>%
       tibble::enframe(name = "variable", value = "named_vector") %>%
       tidyr::unnest_wider("named_vector") %>%
       tibble::as_tibble()
   }
-
+  
   list(var_apl_info, apl_df_list)
 }
 
