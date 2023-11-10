@@ -230,7 +230,6 @@ parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimit
 generate_model_dependent <- function(var_info, model_df,
                                      apl_delimiter = "_",
                                      delimiter = "|") {
-                                      browser()
 
   if (is.vector(var_info) && is.numeric(var_info) && all(!is.na(names(var_info)))) {
     # Process named vector
