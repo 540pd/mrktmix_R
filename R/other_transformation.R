@@ -262,9 +262,9 @@ generate_model_dependent <- function(var_info, model_df,
 
   } else {
     # Dependent Data - create aggregation if required
-    vars_in_model_df_logical<-names(var_info) %in%  names(model_df)
-    vars_expected_model_df<- c(names(var_info)[!vars_in_model_df_logical], c(names(var_info)[vars_in_model_df_logical]))
-    model_df_rel<-aggregate_columns(model_df, vars_expected_model_df, delimeter = var_agg_delimiter)
+    #vars_in_model_df_logical<-names(var_info) %in%  names(model_df)
+    #vars_expected_model_df<- c(names(var_info)[!vars_in_model_df_logical], c(names(var_info)[vars_in_model_df_logical]))
+    model_df_rel<-aggregate_columns(model_df, names(var_info), delimeter = var_agg_delimiter)
 
     # Process list
     var_wt_apl <- generate_variable_combination(var_info)
