@@ -266,7 +266,11 @@ collate_models<-function(candidate_variables_list, model_df, dep_var_info,
     dep_apl_df_list[[2]]<-purrr::map(dep_apl_df_list[[2]], function(x) x[rownames(x)<=mdl_end_date,,drop=F])
   }
 
-  model_result <- purrr::map(dep_apl_df_list[[2]],~collate_base_models(candidate_variables_list,  model_df, .x %>% dplyr::rename(Y = names(.x)[1]),
+  #Aggregate independent variable
+  candidate_variables_list_variable<-unique(unlist(lapply(unlist(candidate_variables_list, recursive = F), names)))
+  model_df_rel<-aggregate_columns(model_df, candidate_variables_list_variable, delimeter = var_agg_delimiter)
+
+  model_result <- purrr::map(dep_apl_df_list[[2]],~collate_base_models(candidate_variables_list,  model_df_rel, .x %>% dplyr::rename(Y = names(.x)[1]),
                                                                        pos_sign_variables , neg_sign_variables ,
                                                                        base_variables, with_intercept,
                                                                        var_agg_delimiter , run_up_to_flexi_vars,
@@ -274,21 +278,11 @@ collate_models<-function(candidate_variables_list, model_df, dep_var_info,
                                                                        drop_pvalue_precision, discard_estimate_sign, drop_highest_estimate,
                                                                        get_model_object ))
 
-  # model_coef_all <- dep_apl_df_list[[1]] %>%
-  #   dplyr::full_join(purrr::map_dfr(model_result, 1, .id = "dependent_id") %>%
-  #                      dplyr::mutate(contri = "Estimate" * sum,
-  #                      contri_perc = "contri"/"dep_sum"*100),
-  #             by = "dependent_id",suffix = c("_dependent","")) %>%
-  #   dplyr::rename(dependent_variable = "variable_dependent", dependent_adstock = "adstock_dependent", dependent_power = "power_dependent", dependent_lag = "lag_dependent")
-  model_coef_all <- dep_apl_df_list[[1]] %>%
-    dplyr::full_join(purrr::map_dfr(model_result, 1, .id = "dependent_id") %>%
+  model_coef_all <- purrr::map_dfr(model_result, 1, .id = "dependent_id") %>%
                        dplyr::mutate(contri = .data[["Estimate"]] * .data[["sum"]],
-                                     contri_perc = .data[["contri"]]/.data[["dep_sum"]]*100),
-                     by = "dependent_id",suffix = c("_dependent","")) %>%
-    dplyr::rename(dependent_variable = "variable_dependent", dependent_adstock = "adstock_dependent", dependent_power = "power_dependent", dependent_lag = "lag_dependent")
+                                     contri_perc = .data[["contri"]]/.data[["dep_sum"]]*100)
 
   model_smry_all <- purrr::map_dfr(model_result, 2, .id = "dependent_id")
-
 
   # Initial summarization of flags
   mdl_smry_flag <- model_coef_all %>%
@@ -345,7 +339,6 @@ collate_models<-function(candidate_variables_list, model_df, dep_var_info,
   mdl_smry_var_wide <- mdl_smry_var %>%
     tidyr::pivot_wider(names_from = "variable_new", values_from = "value")
 
-
   # Join all the summaries
   mdl_smry <- dplyr::full_join(mdl_smry_flag, mdl_smry_var_type, by = c("dependent_id", "model_id", "loop_id")) %>%
     dplyr::full_join(mdl_smry_var_wide, by = c("dependent_id", "model_id", "loop_id"))
@@ -354,12 +347,9 @@ collate_models<-function(candidate_variables_list, model_df, dep_var_info,
   mdl_smry <- mdl_smry %>%
     dplyr::mutate(flag_num = rowSums(dplyr::across(c("flag_pvalue", "flag_sign", "flag_vif")), na.rm = TRUE))
 
-  model_smry_all <- dep_apl_df_list[[1]] %>%
-    dplyr::full_join(dplyr::full_join(model_smry_all, mdl_smry, by = c("dependent_id", "model_id", "loop_id")),
-                     by = "dependent_id") %>%
-    dplyr::rename(dependent_variable = "variable", dependent_adstock = "adstock", dependent_power = "power", dependent_lag = "lag")
+  model_smry_all <- dplyr::full_join(model_smry_all, mdl_smry, by = c("dependent_id", "model_id", "loop_id"))
 
   lm_model_all <- purrr::map(model_result, 3)
 
-  list(model_coef_all, model_smry_all, lm_model_all)
+  list(dep_apl_df_list[[1]], model_smry_all, model_coef_all, lm_model_all)
 }
