@@ -7,24 +7,27 @@
 update_model(model, model_data, variable_to_drop)
 }
 \arguments{
-\item{model}{An object of class \code{\link[stats]{lm}} or similar, representing
-the fitted model to be updated.}
+\item{model}{An object of class \code{\link[stats]{lm}} or similar,
+representing the fitted model to be updated.}
 
-\item{model_data}{A dataframe containing the data that the model was originally
-fitted with. It must contain all the necessary columns used by the model.}
+\item{model_data}{A dataframe containing the data that the model was
+originally fitted with. This dataframe must contain all
+the columns used in the model.}
 
-\item{variable_to_drop}{A character string indicating the name of the variable
-to be dropped from the model. If "(Intercept)" is provided, the model will be
-updated without an intercept.}
+\item{variable_to_drop}{A character string indicating the name of the
+variable to be dropped from the model. Passing
+"(Intercept)" will update the model to fit without
+an intercept.}
 }
 \value{
-An object of the same class as \code{model}, representing the updated
-model without the specified variable or intercept.
+An object of the same class as \code{model}, representing the
+updated model without the specified variable or intercept.
 }
 \description{
-This function updates a given linear model by removing a specified variable.
-The model is re-fitted without the specified variable or the intercept if
-"(Intercept)" is passed as the variable to drop.
+This function updates an existing linear model by removing a specified
+variable. It is particularly useful for model refinement and exploration
+of model variants. The function can also remove the model's intercept if
+"(Intercept)" is specified as the variable to drop.
 }
 \examples{
 \dontrun{
@@ -35,4 +38,5 @@ The model is re-fitted without the specified variable or the intercept if
   # To remove the intercept:
   updated_model_no_intercept <- update_model(initial_model, mtcars, "(Intercept)")
 }
+
 }
