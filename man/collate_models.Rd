@@ -8,14 +8,15 @@ collate_models(
   candidate_variables_list,
   model_df,
   dep_var_info,
-  with_intercept = TRUE,
-  mdl_start_date = NA,
-  mdl_end_date = NA,
   pos_sign_variables,
   neg_sign_variables,
-  var_agg_delimiter = "\\\\|",
+  mdl_start_date = NA,
+  mdl_end_date = NA,
+  base_variables = NA,
+  with_intercept = TRUE,
+  var_agg_delimiter = "|",
   apl_delimiter = "_",
-  var_apl_delimiter = "\\\\|",
+  var_apl_delimiter = "|",
   run_up_to_flexi_vars = 100,
   vif_threshold = 10,
   pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
@@ -27,18 +28,13 @@ collate_models(
 }
 \arguments{
 \item{candidate_variables_list}{A list of lists, where each sublist contains
-candidate predictors for a model.}
+candidate predictors for a model. Each sublist should have a structure similar
+to the \code{candidate_predictors} parameter in \code{assemble_base_models}.}
 
-\item{model_df}{A dataframe of independent variables for all models.}
+\item{model_df}{A dataframe containing independent variables for all models.}
 
 \item{dep_var_info}{Information about the dependent variable, such as its
-transformation and lag.}
-
-\item{with_intercept}{Logical; if TRUE, an intercept is included in the model.}
-
-\item{mdl_start_date}{The start date to filter the data for model assembly.}
-
-\item{mdl_end_date}{The end date to filter the data for model assembly.}
+transformation and lag, provided in a specific format.}
 
 \item{pos_sign_variables}{A vector of variable names expected to have a positive
 sign in the model.}
@@ -46,58 +42,81 @@ sign in the model.}
 \item{neg_sign_variables}{A vector of variable names expected to have a negative
 sign in the model.}
 
+\item{mdl_start_date}{The start date for filtering the data before model assembly.
+Should be of class \code{Date}. Default is NA.}
+
+\item{mdl_end_date}{The end date for filtering the data before model assembly.
+Should be of class \code{Date}. Default is NA.}
+
+\item{base_variables}{A vector of variable names representing base variables
+whose coefficients are set to 1 in the model. Default is NA, indicating no base variables.}
+
+\item{with_intercept}{Logical; if TRUE, an intercept is included in the model.
+Default is TRUE.}
+
 \item{var_agg_delimiter}{A character string used as the delimiter to aggregate
-variables.}
+variables. Default is "\\|".}
 
-\item{apl_delimiter}{The delimiter used in variable names to separate APL components.}
+\item{apl_delimiter}{The delimiter used in variable names to separate APL components.
+Default is "_".}
 
-\item{var_apl_delimiter}{The delimiter used in-between variable names and apl.}
+\item{var_apl_delimiter}{The delimiter used between variable names and APL attributes.
+Default is "|".}
 
 \item{run_up_to_flexi_vars}{An integer representing the number of flexible
-variables to consider up to.}
+variables to consider up to. Default is 0.}
 
 \item{vif_threshold}{A numeric threshold for the Variance Inflation Factor (VIF)
-above which variables are dropped.}
+above which variables are dropped. Default is 10.}
 
 \item{pvalue_thresholds}{A named list containing p-value thresholds for
-intercept, fixed, and flexible variables.}
+intercept, fixed, and flexible variables. Default is c(intercept = 0.15,
+fixed = 0.15, flexible = 0.15).}
 
-\item{drop_pvalue_precision}{The precision for the p-value to drop variables.}
+\item{drop_pvalue_precision}{The precision for the p-value to drop variables.
+Default is 2.}
 
 \item{discard_estimate_sign}{Logical; if TRUE, the sign of the estimate is
-ignored when dropping variables.}
+ignored when dropping variables. Default is TRUE.}
 
 \item{drop_highest_estimate}{Logical; if TRUE, the variable with the highest
-estimate is dropped.}
+estimate is dropped. Default is FALSE.}
 
 \item{get_model_object}{Logical; if TRUE, the function returns the linear model
-object instead of the default list.}
+object instead of the default list. Default is FALSE.}
 }
 \value{
 A list containing the collated models after filtering and preprocessing,
-along with associated statistics.
+along with associated statistics. This list includes details about the dependent
+variable transformations, summary statistics, model coefficients, and linear model objects.
 }
 \description{
-This function extends the \code{collate_base_models} function to accommodate
-additional preprocessing of the dependent variable.
+Extends the \code{collate_base_models} function to include additional preprocessing
+of the dependent variable. This function collates models for linear regression
+from a list of candidate variable sets, applying preprocessing steps to the
+dependent variable and assembling the models.
 }
 \examples{
 \dontrun{
-  # Assuming 'date' is a column in 'independent_df' and 'dependent_df' containing
-  # Date class objects.
+  candidate_variables_list <- list(
+    list(fixed = c("var1"), flexible = c("var3")),
+    list(fixed = c("var2"), flexible = c("var4"))
+  )
+  independent_df <- data.frame(var1 = rnorm(100), var2 = rnorm(100))
+  dependent_df <- data.frame(Y = rnorm(100))
+  dep_info <- list(transformation = "log", lag = 1)
   filter_start <- as.Date("2000-01-01")
   filter_end <- as.Date("2005-12-31")
-
-  dep_info <- list(transformation = "log", lag = 1)
 
   results <- collate_models(
     candidate_variables_list,
     model_df = independent_df,
     model_dep_df = dependent_df,
     dep_var_info = dep_info,
-    filter_start_date = filter_start,
-    filter_end_date = filter_end
+    mdl_start_date = filter_start,
+    mdl_end_date = filter_end
     # Additional parameters can be set as needed
   )
 }
+
 }
