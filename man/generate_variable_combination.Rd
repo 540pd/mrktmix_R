@@ -7,21 +7,29 @@
 generate_variable_combination(variables_wt_apl_constraints)
 }
 \arguments{
-\item{variables_wt_apl_constraints}{A list containing named vectors for each variable with adstock, power, lag, and constraints.
-
-Each named vector should include the following components:
+\item{variables_wt_apl_constraints}{A list containing named lists for each variable.
+Each named list for a variable should include the following components:
 \describe{
-\item{adstock}{A named numeric vector specifying the start, end, and step for adstock.}
-\item{power}{A named numeric vector specifying the start, end, and step for power.}
-\item{lag}{A named numeric vector specifying the start, end, and step for lag.}
-\item{constraints}{An optional character string specifying additional constraints for adstock and power.}
+\item{adstock}{A named numeric vector specifying the start, end, and step
+for adstock, with names "start", "end", "step".}
+\item{power}{A named numeric vector specifying the start, end, and step for
+power, with names "start", "end", "step".}
+\item{lag}{A named numeric vector specifying the start, end, and step for
+lag, with names "start", "end", "step".}
+\item{constraints}{An optional character string specifying additional
+constraints between adstock and power.}
 }}
 }
 \value{
-A list of combinations for adstock, power, and lag for each variable.
+A list where each element represents a combination of adstock, power,
+and lag parameters for a given variable. If multiple variables are
+provided, the function returns a list of lists, with each inner list
+containing combinations for a specific variable.
 }
 \description{
-This function generates combinations of adstock, power, and lag for multiple variables based on specified constraints.
+This function generates combinations of adstock, power, and lag for multiple
+variables based on specified constraints. It is designed to handle a variety
+of marketing variables, each with its own set of transformation parameters and constraints.
 }
 \examples{
 \dontrun{
@@ -39,7 +47,8 @@ This function generates combinations of adstock, power, and lag for multiple var
       constraints = "adstock <= power"
     )
   )
-  generate_variable_combination(variables_wt_apl_constraints)
+  variable_combinations <- generate_variable_combination(variables_wt_apl_constraints)
+  print(variable_combinations)
 }
 
 }
