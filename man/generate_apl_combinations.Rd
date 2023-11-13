@@ -2,7 +2,7 @@
 % Please edit documentation in R/apl_transformation.R
 \name{generate_apl_combinations}
 \alias{generate_apl_combinations}
-\title{Generate Adstock, Power, and Lag Combinations}
+\title{Generate Combinations of Adstock, Power, and Lag}
 \usage{
 generate_apl_combinations(
   adstock_start_end_step,
@@ -12,19 +12,34 @@ generate_apl_combinations(
 )
 }
 \arguments{
-\item{adstock_start_end_step}{A named numeric vector specifying the start, end, and step for adstock.}
+\item{adstock_start_end_step}{A named list 'adstock' containing a named numeric
+vector with 'start', 'end', and 'step' values for
+the adstock rate.}
 
-\item{power_start_end_step}{A named numeric vector specifying the start, end, and step for power.}
+\item{power_start_end_step}{A named list 'power' containing a named numeric
+vector with 'start', 'end', and 'step' values for
+the power transformation.}
 
-\item{lag_start_end_step}{A named numeric vector specifying the start, end, and step for lag.}
+\item{lag_start_end_step}{A named list 'lag' containing a named numeric
+vector with 'start', 'end', and 'step' values for
+the lag.}
 
-\item{apl_constraints}{A list containing additional constraints for adstock, power, and lag.}
+\item{apl_constraints}{A list containing additional constraints for the
+combinations of adstock, power, and lag. Constraints
+should be specified as character strings representing
+logical conditions.}
 }
 \value{
-A list of combinations for adstock, power, and lag.
+A list of all valid combinations of adstock, power, and lag that
+meet the specified ranges and constraints.
 }
 \description{
-This function generates combinations of adstock, power, and lag based on specified constraints.
+This function is designed to:
+\itemize{
+\item Generate a range of adstock, power, and lag values based on specified start, end, and step values.
+\item Create combinations of these values.
+\item Apply additional logical constraints to these combinations if specified.
+}
 }
 \examples{
 \dontrun{
