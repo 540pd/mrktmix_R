@@ -7,18 +7,28 @@
 calculate_vif(model)
 }
 \arguments{
-\item{model}{A \code{lm} or \code{glm} object representing the fitted linear regression model.}
+\item{model}{A \code{lm} or \code{glm} object representing the fitted linear regression
+model. The model must be of class 'lm' or 'glm'.}
 }
 \value{
-A numeric vector containing the VIF values for each predictor variable in the model.
+A numeric vector containing the VIF values for each predictor variable
+in the model. If the model includes an intercept, its VIF is represented
+as \code{NA}. In case of calculation errors, \code{Inf} is returned for all
+predictor variables.
 }
 \description{
-This function calculates the VIF for a given linear regression model. It returns a numeric vector containing the VIF values for each predictor variable. If the calculation fails (e.g., due to multicollinearity issues), it returns \code{Inf} for all predictor variables.
+Computes the Variance Inflation Factor (VIF) for each predictor variable in a
+linear regression model. This function is useful for assessing multicollinearity.
+In cases where VIF calculation fails (e.g., due to severe multicollinearity),
+it returns \code{Inf} for the affected predictor variables.
 }
 \examples{
 \dontrun{
-  lm_model <- lm(Sales ~ ., data = advertising)
-  calculate_vif(lm_model)
+  advertising <- data.frame(tv = runif(10), radio = runif(10), newspaper = runif(10),
+   sales = runif(10))
+  lm_model <- lm(sales ~ tv + radio + newspaper, data = advertising)
+  vif_values <- calculate_vif(lm_model)
+  print(vif_values)
 }
 
 }
