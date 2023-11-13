@@ -2,39 +2,59 @@
 % Please edit documentation in R/apl_transformation.R
 \name{generate_apl_dataframe}
 \alias{generate_apl_dataframe}
-\title{Apply Adstock, Power, and Lag Vectorized Transformation to a Data Frame}
+\title{Apply Vectorized Adstock, Power, and Lag Transformations to a Data Frame}
 \usage{
 generate_apl_dataframe(
   modeling_df,
   adstock,
   power,
   lag,
-  apl_delimeter = "_",
-  delimeter = "|"
+  apl_delimiter = "_",
+  delimiter = "|"
 )
 }
 \arguments{
-\item{modeling_df}{A data frame containing the input variables.}
+\item{modeling_df}{A data frame containing the input variables. This should
+be structured with columns representing different marketing
+variables and rows representing time periods.}
 
-\item{adstock}{A vector of adstock rates for the transformations.}
+\item{adstock}{The adstock rate for the transformation, which controls
+the degree of weight given to past values.}
 
-\item{power}{A vector of power transformations to capture the non-linear effectiveness of marketing activity.}
+\item{power}{The power transformation parameter, used to capture the
+non-linear effectiveness of marketing activities.}
 
-\item{lag}{A vector of lag parameters for the time lag in the transformations.}
+\item{lag}{The lag parameter, specifying the time lag in the
+transformation to account for delayed effects.}
 
-\item{apl_delimeter}{Delimiter used to separate Adstock, Power, and Lag values in resulting column names.}
+\item{apl_delimiter}{Delimiter used to separate Adstock, Power, and Lag values
+in resulting column names.}
 
-\item{delimeter}{Delimiter used to separate original column name and apl in output data frame.}
+\item{delimiter}{Delimiter used to separate original column name and apl
+suffix in output data frame.}
 }
 \value{
-A data frame with vectorized Adstock, Power, and Lag-transformed values.
+A data frame with each column transformed by all combinations of
+Adstock, Power, and Lag parameters. The column names in the output
+indicate the specific transformations applied.
 }
 \description{
-This function applies vectorized Adstock, Power, and Lag transformations to a given data frame.
+This function extends \code{compute_apl_values} to apply vectorized Adstock, Power,
+and Lag transformations to a data frame. It allows for the application of multiple
+transformation parameters simultaneously, creating a comprehensive transformed output.
+}
+\details{
+The function iteratively applies combinations of Adstock, Power, and Lag
+transformations to the input data frame. Each column in the resulting data frame
+corresponds to one unique combination of these parameters. This function is
+particularly useful for scenarios where different sets of transformation
+parameters need to be evaluated simultaneously.
 }
 \examples{
 \dontrun{
-  generate_apl_dataframe(advertising, adstock = c(0.8, 0.9), power = c(2, 3), lag = c(1, 2))
+  # Applying vectorized transformations to 'advertising' data frame
+  generate_apl_dataframe(advertising, adstock = c(0.8, 0.9),
+                         power = c(2, 3), lag = c(1, 2))
 }
 
 }
