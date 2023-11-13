@@ -2,20 +2,35 @@
 % Please edit documentation in R/model_base.R
 \name{determine_pvalue_flag}
 \alias{determine_pvalue_flag}
-\title{Determine P-Value Flag}
+\title{Flag P-Values Based on Predefined Thresholds}
 \usage{
 determine_pvalue_flag(type, pvalue, pvalue_thresholds)
 }
 \arguments{
-\item{type}{Character string indicating the type of the predictor (can be 'intercept', 'fixed', or 'flexible').}
+\item{type}{A character string indicating the type of the predictor.
+Valid options are 'intercept', 'fixed', or 'flexible'.}
 
-\item{pvalue}{Numeric p-value of the predictor.}
+\item{pvalue}{A numeric value representing the p-value of the predictor.}
 
-\item{pvalue_thresholds}{Named numeric vector of thresholds for each predictor type. Names can be 'intercept', 'fixed', and 'flexible'.}
+\item{pvalue_thresholds}{A named numeric vector of thresholds for each
+predictor type. The names of the vector should
+be 'intercept', 'fixed', and 'flexible'.}
 }
 \value{
-Logical; TRUE if the p-value is above the threshold for its type.
+A logical value; TRUE if the p-value is above the threshold for its
+respective type. This function helps in identifying statistically
+significant predictors based on their p-values and predefined criteria.
 }
 \description{
-Flags p-values based on predefined thresholds for different types of predictors.
+This function evaluates p-values of predictors and flags them based on
+predefined thresholds specific to their types (intercept, fixed, or flexible).
+}
+\examples{
+\dontrun{
+  pvalue_thresholds <- c(intercept = 0.05, fixed = 0.05, flexible = 0.1)
+  determine_pvalue_flag("fixed", 0.04, pvalue_thresholds)     # Returns FALSE
+  determine_pvalue_flag("flexible", 0.08, pvalue_thresholds)  # Returns TRUE
+  determine_pvalue_flag("intercept", 0.06, pvalue_thresholds) # Returns TRUE
+}
+
 }
