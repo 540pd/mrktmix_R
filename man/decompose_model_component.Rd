@@ -9,28 +9,30 @@ decompose_model_component(
   model_df,
   is_weight_coefficient = TRUE,
   apl_delimiter = "_",
-  delimiter = "\\\\|"
+  delimiter = "|"
 )
 }
 \arguments{
-\item{variables_wt_weights}{A named vector of weights for the variables, where names include APL info.}
+\item{variables_wt_weights}{A named vector of weights for the variables, where
+names include APL information.}
 
-\item{model_df}{Data frame containing the variables to be transformed.}
+\item{model_df}{A data frame containing the variables to be transformed.}
 
-\item{is_weight_coefficient}{Logical indicating if the weights should be treated as coefficients.}
+\item{is_weight_coefficient}{Logical; if TRUE, weights are treated as
+coefficients. If FALSE, they are treated as contributions.}
 
-\item{apl_delimiter}{The delimiter used in variable names to separate APL components.}
+\item{apl_delimiter}{Delimiter used in variable names to separate APL components.}
 
-\item{delimiter}{The delimiter used in variable names to denote different variables.}
+\item{delimiter}{Delimiter used in variable names to denote different variables.}
 }
 \value{
-A transformed data frame with variables weighted and APL transformations applied.
+A transformed data frame with variables weighted and APL transformations
+applied.
 }
 \description{
-This function takes a set of variables with weights and applies Adstock, Power,
-and Lag (APL) transformations to the variables within a model dataframe.
-It handles the decomposition of model components based on provided coefficients
-or contributions.
+Applies Adstock, Power, and Lag (APL) transformations to variables within a
+model data frame. It handles the decomposition of model components based on
+provided weights, which can be treated either as coefficients or contributions.
 }
 \examples{
 \dontrun{
@@ -45,6 +47,7 @@ or contributions.
   transformed_df <- decompose_model_component(variables_wt_weights, model_df,
                                               is_weight_coefficient = FALSE,
                                               apl_delimiter = "_",
-                                              delimiter = "\\\\|")
+                                              delimiter = "|")
 }
+
 }
