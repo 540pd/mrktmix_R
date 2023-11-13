@@ -7,28 +7,42 @@
 compute_apl_values(modeling_df, adstock, power, lag)
 }
 \arguments{
-\item{modeling_df}{A data frame containing the input variables.}
+\item{modeling_df}{A data frame containing the input variables. This should
+be structured with columns representing different marketing
+variables and rows representing time periods.}
 
-\item{adstock}{The adstock rate for the transformation.}
+\item{adstock}{The adstock rate for the transformation, which controls
+the degree of weight given to past values.}
 
-\item{power}{The power transformation to capture the non-linear effectiveness of marketing activity.}
+\item{power}{The power transformation parameter, used to capture the
+non-linear effectiveness of marketing activities.}
 
-\item{lag}{The lag parameter for the time lag in the transformation.}
+\item{lag}{The lag parameter, specifying the time lag in the
+transformation to account for delayed effects.}
 }
 \value{
-A data frame with Adstock, Power and Lag transformed values.
+\if{html}{\out{<div class="sourceCode">}}\preformatted{       A transformed data frame with Adstock, Power, and Lag
+               applied to the input variables.
+}\if{html}{\out{</div>}}
 }
 \description{
-This function applies the Adstock, Power, and Lag transformation to a given data frame.
+This function applies Adstock, Power, and Lag transformations to a data frame.
+It is designed to process input variables for market mix modeling, enhancing
+their utility for subsequent analysis.
 }
 \details{
-The function applies the Adstock transformation using a recursive filtering
-method and raises the filtered values to the power specified. It then lags
-the result by the specified time lag.
+The function first applies the Adstock transformation using a recursive
+filtering method. It then raises the filtered values to the specified power,
+capturing non-linearities in the effect of marketing activities. Finally,
+it introduces a lag, shifting the transformed values by the specified
+time periods to account for delayed effects.
 }
 \examples{
 \dontrun{
+  # Basic usage with a sample data frame 'advertising'
   compute_apl_values(advertising, adstock = 0.8, power = 2, lag = 1)
+
+  # Applying to a single column 'Sales' in 'advertising'
   compute_apl_values(advertising[,"Sales",drop=F], adstock = 0.8, power = 2, lag = 1)
 }
 
