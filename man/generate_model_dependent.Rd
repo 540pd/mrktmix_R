@@ -8,33 +8,40 @@ generate_model_dependent(
   var_info,
   model_df,
   apl_delimiter = "_",
-  delimiter = "\\\\|"
+  var_apl_delimiter = "|",
+  var_agg_delimiter = "|"
 )
 }
 \arguments{
 \item{var_info}{A named numeric vector or a list detailing the variables and
-their respective APL transformations.}
+their respective APL transformations. The named numeric vector format uses
+\code{var_apl_delimiter} to separate variable names and APL attributes, while the
+list format provides detailed specifications for each variable.}
 
 \item{model_df}{A data frame containing model variables to which the APL
 transformations are to be applied.}
 
-\item{apl_delimiter}{A string delimiter for concatenating variable names with
-their APL attributes when \code{var_info} is a named numeric vector. Default "_".}
+\item{apl_delimiter}{Delimiter used for concatenating variable names with
+their APL attributes when \code{var_info} is a named numeric vector (default "_").}
 
-\item{delimiter}{A string delimiter for separating variable names from their
-APL attributes when \code{var_info} is a named numeric vector. Default "\\|".}
+\item{var_apl_delimiter}{Delimiter used for separating variable names from their
+APL attributes when \code{var_info} is a named numeric vector (default "|").}
+
+\item{var_agg_delimiter}{Delimiter used for aggregating variables (default "|").}
 }
 \value{
 A list containing a tibble of APL information and a list of data
-frames with APL transformations applied.
+frames with APL transformations applied. The tibble includes variable names
+and their APL attributes, while each data frame in the list represents a
+model-dependent transformation.
 }
 \description{
 Applies Adstock-Power-Lag (APL) transformations to variable information within
 a model data frame. The function returns a list containing APL information
 and a list of data frames with applied transformations. The \code{apl_delimiter}
-and \code{delimiter} are used to interpret and construct variable names when
+and \code{var_apl_delimiter} are used to interpret and construct variable names when
 \code{var_info} is a named numeric vector. When \code{var_info} is a list, the function
-generates variable combinations and applies APL to \code{model_df}.
+generates variable combinations and applies APL transformations to \code{model_df}.
 }
 \examples{
 \dontrun{
@@ -53,4 +60,5 @@ generates variable combinations and applies APL to \code{model_df}.
   )
   result_list <- generate_model_dependent(var_info_list, model_df)
 }
+
 }
