@@ -11,20 +11,25 @@ compose_variable_apl(
 )
 }
 \arguments{
-\item{variables_wt_named_apl}{A list where each element is named after a variable and contains a
-named vector of APL attributes: adstock, power, and lag.}
+\item{variables_wt_named_apl}{A list where each element is a named vector representing
+a variable. The names of the elements are the variable names, and each named
+vector contains the APL attributes: adstock, power, and lag.}
 
-\item{apl_delimiter}{The delimiter to use between the variable name and APL values.}
+\item{apl_delimiter}{The delimiter to use between the variable name and its APL values
+(default is "_").}
 
-\item{delimiter}{The delimiter to use between APL attributes.}
+\item{delimiter}{The delimiter to use between different APL attributes
+(default is "|").}
 }
 \value{
-A character vector of variable names composed with their APL attributes.
+A character vector where each element is a variable name composed with
+its APL attributes. These names follow the format:
+\verb{variable_name[delimiter]adstock_value[apl_delimiter]power_value[apl_delimiter]lag_value}.
 }
 \description{
-This function takes a list of variables with their corresponding Adstock, Power, and Lag (APL)
-attributes and composes a standardized naming convention for each variable incorporating
-its APL attributes.
+Constructs standardized variable names by incorporating Adstock, Power, and Lag
+(APL) attributes into each variable's name. This function is useful for creating
+clear and descriptive variable names in models where APL transformations are applied.
 }
 \examples{
 \dontrun{
@@ -32,7 +37,10 @@ its APL attributes.
     "variable1" = c("adstock" = 0.5, "power" = 2, "lag" = 1),
     "variable2" = c("adstock" = 0.3, "power" = 1, "lag" = 0)
   )
-  composed_names <- compose_variable_apl(variables_wt_named_apl)
+  composed_names <- compose_variable_apl(variables_wt_named_apl,
+                                         apl_delimiter = "_",
+                                         delimiter = "|")
+  print(composed_names)
 }
 
 }
