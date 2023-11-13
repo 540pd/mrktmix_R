@@ -1,21 +1,125 @@
-#' Aggregate Columns in a Data Frame
+#' Compose Variable Names with Adstock, Power, and Lag (APL) Attributes
 #'
-#' This function aggregates specified columns in a data frame and returns a new data frame.
+#' Constructs standardized variable names by incorporating Adstock, Power, and Lag
+#' (APL) attributes into each variable's name. This function is useful for creating
+#' clear and descriptive variable names in models where APL transformations are applied.
 #'
-#' @param modeling_df A data frame containing the input variables.
-#' @param aggregated_variables A character vector specifying the columns to aggregate.
-#' @param delimeter Delimiter used to find individual variables for aggregated_variables.
+#' @param variables_wt_named_apl A list where each element is a named vector representing
+#'        a variable. The names of the elements are the variable names, and each named
+#'        vector contains the APL attributes: adstock, power, and lag.
+#' @param apl_delimiter The delimiter to use between the variable name and its APL values
+#'        (default is "_").
+#' @param delimiter The delimiter to use between different APL attributes
+#'        (default is "|").
 #'
-#' @return A data frame with aggregated values.
+#' @return A character vector where each element is a variable name composed with
+#'         its APL attributes. These names follow the format:
+#'         `variable_name[delimiter]adstock_value[apl_delimiter]power_value[apl_delimiter]lag_value`.
 #'
 #' @examples
 #' \dontrun{
-#'   aggregate_columns(advertising, c("Sales", "TV|Radio|Newspaper"), delimeter = "|")
+#'   variables_wt_named_apl <- list(
+#'     "variable1" = c("adstock" = 0.5, "power" = 2, "lag" = 1),
+#'     "variable2" = c("adstock" = 0.3, "power" = 1, "lag" = 0)
+#'   )
+#'   composed_names <- compose_variable_apl(variables_wt_named_apl,
+#'                                          apl_delimiter = "_",
+#'                                          delimiter = "|")
+#'   print(composed_names)
 #' }
 #'
-#' @export
-aggregate_columns <- function(modeling_df, aggregated_variables, delimeter = "|") {
-  individual_variables <- stringr::str_split(aggregated_variables, stringr::fixed(delimeter))
+compose_variable_apl <- function(variables_wt_named_apl, apl_delimiter = "_", delimiter = "|") {
+  # Compose variable names with their APL attributes into a standardized format
+  result <- mapply(function(name, values) {
+    # Concatenate each value with the variable name using the provided delimiters
+    paste(name, paste(unlist(values), collapse = apl_delimiter), sep = delimiter)
+  }, names(variables_wt_named_apl), variables_wt_named_apl, SIMPLIFY = FALSE)
+
+  # Combine the result into a single character vector without names
+  unname(unlist(result))
+}
+
+#' Parse Variable with Adstock, Power, and Lag
+#'
+#' Parses a vector of strings containing variable information along with Adstock,
+#' Power, and Lag (APL) attributes, separated by specified delimiters. Each string
+#' in the vector should contain a variable name followed by up to three numeric
+#' values representing the APL attributes, in a consistent order and separated
+#' by the delimiters.
+#'
+#' @param variables_wt_apl A character vector where each element contains a
+#'   variable name and up to three numeric values for adstock, power, and lag,
+#'   separated by `delimiter` and `apl_delimiter`.
+#' @param apl_delimiter A string representing the delimiter used between the
+#'   adstock, power, and lag values in each string. It cann't be period (.)
+#' @param delimiter A string representing the main delimiter used between the
+#'   variable name and the APL attributes in each string. It cann't be period (.)
+#'
+#' @return A data frame where each row corresponds to an element in
+#'   `variables_wt_apl`, with columns for the variable name, adstock value,
+#'   power value, and lag value.
+#'
+#' @examples
+#' \dontrun{
+#'   parsed_data <- parse_variable_wt_apl(c("TV_Smart|0.8_0.22_0.11", "Radio|0.5_0.15"),
+#'                                        apl_delimiter = "_",
+#'                                        delimiter = "|")
+#'   print(parsed_data)
+#' }
+#'
+#' @importFrom stats na.omit
+#'
+parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimiter = "|") {
+
+  # Escape the special characters in regular expression
+  escaped_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", delimiter)
+  escaped_apl_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", apl_delimiter)
+
+  regex_pattern <- paste0("(.+?)", escaped_delimiter, "([0-9.]+", escaped_apl_delimiter, "?[0-9.]*", escaped_apl_delimiter, "?[0-9.]*)$")
+
+  matches <- stringr::str_match(variables_wt_apl, regex_pattern)
+
+  if(any(!stats::complete.cases(matches))){
+    matches[!stats::complete.cases(matches),]<-c(variables_wt_apl[!stats::complete.cases(matches)], variables_wt_apl[!stats::complete.cases(matches)], paste(0,1,0,sep=apl_delimiter))
+  }
+  if (any(is.na(matches))) {
+    warning("Some inputs did not match the expected format and will be omitted.")
+    matches <- na.omit(matches)
+  }
+
+  data.frame(
+    variable = matches[, 2],
+    adstock = as.numeric(stringr::str_extract(matches[, 3], "^[0-9.]+")),
+    power = as.numeric(stringr::str_extract(stringr::str_replace(matches[, 3], "^[0-9.]+_", ""), "^[0-9.]+")),
+    lag = as.numeric(stringr::str_extract(matches[, 3], "[0-9.]+$"))
+  )
+}
+
+#' Aggregate Columns in a Data Frame
+#'
+#' Aggregates specified columns in a data frame and returns a new data frame with
+#' these aggregated values. It takes a character vector of column names,
+#' possibly representing aggregated variables separated by a delimiter, and
+#' computes the sum of these variables row-wise.
+#'
+#' @param modeling_df A data frame containing the input variables.
+#' @param aggregated_variables A character vector specifying the columns to
+#'   aggregate. The columns are expected to be delimited strings representing
+#'   the individual variables to aggregate.
+#' @param delimiter A string used as a delimiter to split the names in
+#'   `aggregated_variables`. Default is "|".
+#'
+#' @return A data frame with columns specified in `aggregated_variables` aggregated.
+#'
+#' @examples
+#' \dontrun{
+#'   advertising <- data.frame(tv = runif(10), radio = runif(10), newspaper = runif(10),
+#'    sales = runif(10))
+#'   aggregate_columns(advertising, c("Sales", "TV|Radio|Newspaper"), delimiter = "|")
+#' }
+#'
+aggregate_columns <- function(modeling_df, aggregated_variables, delimiter = "|") {
+  individual_variables <- stringr::str_split(aggregated_variables, stringr::fixed(delimiter))
   aggregated_vals <- lapply(individual_variables, function(x) apply(modeling_df[, x, drop = FALSE], 1, sum, na.rm = TRUE))
   aggregated_df <- as.data.frame(do.call(cbind, stats::setNames(aggregated_vals, aggregated_variables)))
   return(aggregated_df)
@@ -23,18 +127,20 @@ aggregate_columns <- function(modeling_df, aggregated_variables, delimeter = "|"
 
 #' Decompose Model Component with Adstock, Power, and Lag (APL) Transformations
 #'
-#' This function takes a set of variables with weights and applies Adstock, Power,
-#' and Lag (APL) transformations to the variables within a model dataframe.
-#' It handles the decomposition of model components based on provided coefficients
-#' or contributions.
+#' Applies Adstock, Power, and Lag (APL) transformations to variables within a
+#' model data frame. It handles the decomposition of model components based on
+#' provided weights, which can be treated either as coefficients or contributions.
 #'
-#' @param variables_wt_weights A named vector of weights for the variables, where names include APL info.
-#' @param model_df Data frame containing the variables to be transformed.
-#' @param is_weight_coefficient Logical indicating if the weights should be treated as coefficients.
-#' @param apl_delimiter The delimiter used in variable names to separate APL components.
-#' @param delimiter The delimiter used in variable names to denote different variables.
+#' @param variables_wt_weights A named vector of weights for the variables, where
+#'   names include APL information.
+#' @param model_df A data frame containing the variables to be transformed.
+#' @param is_weight_coefficient Logical; if TRUE, weights are treated as
+#'   coefficients. If FALSE, they are treated as contributions.
+#' @param apl_delimiter Delimiter used in variable names to separate APL components.
+#' @param delimiter Delimiter used in variable names to denote different variables.
 #'
-#' @return A transformed data frame with variables weighted and APL transformations applied.
+#' @return A transformed data frame with variables weighted and APL transformations
+#'   applied.
 #'
 #' @examples
 #' \dontrun{
@@ -51,6 +157,7 @@ aggregate_columns <- function(modeling_df, aggregated_variables, delimeter = "|"
 #'                                               apl_delimiter = "_",
 #'                                               delimiter = "|")
 #' }
+#'
 #' @importFrom dplyr mutate across any_of bind_cols select if_else cur_column
 #' @importFrom purrr pmap
 #' @importFrom magrittr "%>%"
@@ -58,6 +165,7 @@ aggregate_columns <- function(modeling_df, aggregated_variables, delimeter = "|"
 #' @importFrom stringr str_replace str_split
 #' @importFrom tidyselect everything
 #' @export
+#'
 decompose_model_component <- function(variables_wt_weights, model_df,
                                       is_weight_coefficient = TRUE,
                                       apl_delimiter = "_",
@@ -80,29 +188,29 @@ decompose_model_component <- function(variables_wt_weights, model_df,
     variables_wt_weights_left <- variables_wt_weights_left[!intercept_exists]
   }
 
-if(length(variables_wt_weights_left)){
-  # Parse variables for APL information
-  variable_info <- parse_variable_wt_apl(names(variables_wt_weights_left), apl_delimiter, delimiter)
-  # update variables_wt_weights names 
-  variables_wt_weights_captured <- variables_wt_weights[!names(variables_wt_weights) %in% names(variables_wt_weights_left)]
-  variables_wt_weights_apl <- setNames(variables_wt_weights_left, variable_info$variable)
-  names(variables_wt_weights)[names(variables_wt_weights) %in% names(variables_wt_weights_left)]<-names(variables_wt_weights_apl)
+  if(length(variables_wt_weights_left)){
+    # Parse variables for APL information
+    variable_info <- parse_variable_wt_apl(names(variables_wt_weights_left), apl_delimiter, delimiter)
+    # update variables_wt_weights names
+    variables_wt_weights_captured <- variables_wt_weights[!names(variables_wt_weights) %in% names(variables_wt_weights_left)]
+    variables_wt_weights_apl <- setNames(variables_wt_weights_left, variable_info$variable)
+    names(variables_wt_weights)[names(variables_wt_weights) %in% names(variables_wt_weights_left)]<-names(variables_wt_weights_apl)
 
-  # Create APL information list using pmap
-  apl_info <- purrr::pmap(variable_info, function(variable, adstock, power, lag) {
-    setNames(c(adstock, power, lag), names(variable_info)[-1])
-  }) %>%
-    setNames(variable_info$variable)
+    # Create APL information list using pmap
+    apl_info <- purrr::pmap(variable_info, function(variable, adstock, power, lag) {
+      setNames(c(adstock, power, lag), names(variable_info)[-1])
+    }) %>%
+      setNames(variable_info$variable)
 
-  # Apply APL transformations and recombine with the selected data
-  model_df_transformed <- apply_apl(model_df, apl_info)
-  model_df_combined <- model_df_selected %>%
-    dplyr::bind_cols(model_df_transformed) %>%
-    dplyr::select(tidyr::all_of(names(variables_wt_weights)))
-} else {
-  model_df_combined <- model_df_selected %>%
-    dplyr::select(tidyr::all_of(names(variables_wt_weights)))
-}
+    # Apply APL transformations and recombine with the selected data
+    model_df_transformed <- apply_apl(model_df, apl_info)
+    model_df_combined <- model_df_selected %>%
+      dplyr::bind_cols(model_df_transformed) %>%
+      dplyr::select(tidyr::all_of(names(variables_wt_weights)))
+  } else {
+    model_df_combined <- model_df_selected %>%
+      dplyr::select(tidyr::all_of(names(variables_wt_weights)))
+  }
 
   # Adjust for weight coefficients if not treating as coefficients
   if (!is_weight_coefficient) {
@@ -114,106 +222,31 @@ if(length(variables_wt_weights_left)){
   return(model_df_combined)
 }
 
-#' Compose Variable Names with Adstock, Power, and Lag (APL) Attributes
-#'
-#' This function takes a list of variables with their corresponding Adstock, Power, and Lag (APL)
-#' attributes and composes a standardized naming convention for each variable incorporating
-#' its APL attributes.
-#'
-#' @param variables_wt_named_apl A list where each element is named after a variable and contains a
-#'        named vector of APL attributes: adstock, power, and lag.
-#' @param apl_delimiter The delimiter to use between the variable name and APL values.
-#' @param delimiter The delimiter to use between APL attributes.
-#'
-#' @return A character vector of variable names composed with their APL attributes.
-#'
-#' @examples
-#' \dontrun{
-#'   variables_wt_named_apl <- list(
-#'     "variable1" = c("adstock" = 0.5, "power" = 2, "lag" = 1),
-#'     "variable2" = c("adstock" = 0.3, "power" = 1, "lag" = 0)
-#'   )
-#'   composed_names <- compose_variable_apl(variables_wt_named_apl)
-#' }
-#'
-#' @export
-compose_variable_apl <- function(variables_wt_named_apl, apl_delimiter = "_", delimiter = "|") {
-  # Compose variable names with their APL attributes into a standardized format
-  result <- mapply(function(name, values) {
-    # Concatenate each value with the variable name using the provided delimiters
-    paste(name, paste(unlist(values), collapse = apl_delimiter), sep = delimiter)
-  }, names(variables_wt_named_apl), variables_wt_named_apl, SIMPLIFY = FALSE)
-
-  # Combine the result into a single character vector without names
-  unname(unlist(result))
-}
-
-#' Parse Variable with Adstock, Power, and Lag
-#'
-#' This function parses a vector of strings containing variable information along with adstock, power, and lag, separated by specified delimiters.
-#' Each string should contain variable names and up to three numeric values (adstock, power, and lag) in a consistent order, separated by delimiters.
-#'
-#' @param variables_wt_apl A character vector with each element containing variable names and up to three numeric values separated by `delimeter` and `apl_delimeter`.
-#' @param apl_delimiter A string representing the delimiter between adstock, power, and lag values.
-#' @param delimiter A string representing the main delimiter between variable and apl in the variables_wt_apl strings.
-#' @return A data frame containing variables and their corresponding adstock, power, and lag values.
-#' @examples
-#' \dontrun{
-#' parse_variable_wt_apl(c("TV_Smart|0.8_0.22_0.11", "Radio|0.5_0.15"), "_", "|")
-#' }
-#' @importFrom stats na.omit
-#' @export
-parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimiter = "|") {
-  # check acceptable pattern
-  # if(sum(!stringr::str_detect(variables_wt_apl, paste0(stringr::fixed(delimiter),"\\d+(\\.\\d+)?",stringr::fixed(apl_delimiter),"\\d+(\\.\\d+)?",stringr::fixed(apl_delimiter),"\\d+(\\.\\d+)?$")))){
-  #   stop(paste("Please ensure that all variable with apl should be followed by",delimiter,"then followed by adstock, power and lag, each separated by an underscore",apl_delimiter))
-  # }
-
-  # Escape the special characters in regular expression
-  escaped_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", delimiter)
-  escaped_apl_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", apl_delimiter)
-
-  regex_pattern <- paste0("(.+?)", escaped_delimiter, "([0-9.]+", escaped_apl_delimiter, "?[0-9.]*", escaped_apl_delimiter, "?[0-9.]*)$")
-
-  matches <- stringr::str_match(variables_wt_apl, regex_pattern)
-
-  if(any(!complete.cases(matches))){
-    matches[!complete.cases(matches),]<-c(variables_wt_apl[!complete.cases(matches)], variables_wt_apl[!complete.cases(matches)], paste(0,1,0,sep=apl_delimiter))
-  }
-  if (any(is.na(matches))) {
-    warning("Some inputs did not match the expected format and will be omitted.")
-    matches <- na.omit(matches)
-  }
-
-  data.frame(
-    variable = matches[, 2],
-    adstock = as.numeric(stringr::str_extract(matches[, 3], "^[0-9.]+")),
-    power = as.numeric(stringr::str_extract(stringr::str_replace(matches[, 3], "^[0-9.]+_", ""), "^[0-9.]+")),
-    lag = as.numeric(stringr::str_extract(matches[, 3], "[0-9.]+$"))
-  )
-}
-
 #' Generate Model-Dependent Data Frames with APL Transformations
 #'
 #' Applies Adstock-Power-Lag (APL) transformations to variable information within
 #' a model data frame. The function returns a list containing APL information
 #' and a list of data frames with applied transformations. The `apl_delimiter`
-#' and `delimiter` are used to interpret and construct variable names when
+#' and `var_apl_delimiter` are used to interpret and construct variable names when
 #' `var_info` is a named numeric vector. When `var_info` is a list, the function
-#' generates variable combinations and applies APL to `model_df`.
+#' generates variable combinations and applies APL transformations to `model_df`.
 #'
 #' @param var_info A named numeric vector or a list detailing the variables and
-#'   their respective APL transformations.
+#'   their respective APL transformations. The named numeric vector format uses
+#'   `var_apl_delimiter` to separate variable names and APL attributes, while the
+#'   list format provides detailed specifications for each variable.
 #' @param model_df A data frame containing model variables to which the APL
 #'   transformations are to be applied.
-#' @param apl_delimiter A string delimiter for concatenating variable names with
-#'   their APL attributes when `var_info` is a named numeric vector. Default "_".
-#' @param var_apl_delimiter A string delimiter for separating variable names from their
-#'   APL attributes when `var_info` is a named numeric vector. Default "\\|".
+#' @param apl_delimiter Delimiter used for concatenating variable names with
+#'   their APL attributes when `var_info` is a named numeric vector (default "_").
+#' @param var_apl_delimiter Delimiter used for separating variable names from their
+#'   APL attributes when `var_info` is a named numeric vector (default "|").
+#' @param var_agg_delimiter Delimiter used for aggregating variables (default "|").
 #'
 #' @return A list containing a tibble of APL information and a list of data
-#'   frames with APL transformations applied.
-#' @export
+#'   frames with APL transformations applied. The tibble includes variable names
+#'   and their APL attributes, while each data frame in the list represents a
+#'   model-dependent transformation.
 #'
 #' @examples
 #' \dontrun{
@@ -232,22 +265,23 @@ parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimit
 #'   )
 #'   result_list <- generate_model_dependent(var_info_list, model_df)
 #' }
-#' @importFrom purrr flatten
+#'
+#' @importFrom purrr map flatten
 #' @importFrom tibble enframe as_tibble
 #' @importFrom tidyr unnest_wider
+#'
 generate_model_dependent <- function(var_info, model_df,
                                      apl_delimiter = "_",
                                      var_apl_delimiter = "|", var_agg_delimiter = "|") {
-
   if (is.vector(var_info) && is.numeric(var_info) && all(!is.na(names(var_info)))) {
 
     # Dependent Data - create aggregation if required
     vars_in_model_df_logical<-names(var_info) %in%  names(model_df)
     vars_expected_model_df<-names(var_info)[!vars_in_model_df_logical] %>%
-        parse_variable_wt_apl(apl_delimiter, var_apl_delimiter) %>%
-        dplyr::pull(variable) %>%
-        c(names(var_info)[vars_in_model_df_logical])
-    model_df_rel<-aggregate_columns(model_df, vars_expected_model_df, delimeter = var_agg_delimiter)
+      parse_variable_wt_apl(apl_delimiter, var_apl_delimiter) %>%
+      dplyr::pull("variable") %>%
+      c(names(var_info)[vars_in_model_df_logical])
+    model_df_rel<-aggregate_columns(model_df, vars_expected_model_df,  var_agg_delimiter)
 
     # Process named vector
     apl_df_list <- list(
@@ -262,40 +296,59 @@ generate_model_dependent <- function(var_info, model_df,
 
   } else {
     # Dependent Data - create aggregation if required
-    #vars_in_model_df_logical<-names(var_info) %in%  names(model_df)
-    #vars_expected_model_df<- c(names(var_info)[!vars_in_model_df_logical], c(names(var_info)[vars_in_model_df_logical]))
-    model_df_rel<-aggregate_columns(model_df, names(var_info), delimeter = var_agg_delimiter)
+    model_df_rel<-aggregate_columns(model_df, names(var_info), var_agg_delimiter)
 
     # Process list
     var_wt_apl <- generate_variable_combination(var_info)
     apl_df_list <- purrr::map(var_wt_apl, ~apply_apl(model_df_rel, .x) %>%
-                         dplyr::mutate(dplyr::across(everything(), ~tidyr::replace_na(.x, 0))))
+                                dplyr::mutate(dplyr::across(everything(), ~tidyr::replace_na(.x, 0))))
     var_apl_info <- var_wt_apl %>%
       purrr::flatten() %>%
       tibble::enframe(name = "variable", value = "named_vector") %>%
       tidyr::unnest_wider("named_vector") %>%
       tibble::as_tibble()
   }
-  
+
   list(var_apl_info, apl_df_list)
 }
 
 #' Get Dependent and Independent Variables
 #'
-#' This function determines the type of a model based on the presence of characters + and -,
-#' and processes the model variable accordingly to extract dependent and independent variables.
+#' Determines the type of a model based on the presence of characters '+' and '-',
+#' and processes the model variable to extract dependent and independent variables.
+#' It classifies models into types like "Remodel", "Aggregate", "Segregate",
+#' or "Aggregate & Segregate" based on the syntax of the model variable.
 #'
-#' @param model_variable A character string representing the model variable.
-#' @param var_agg_delimiter A character string representing the delimiter for aggregated variables. Default is "|".
-#' @param trim A logical indicating whether to trim output or not. Default is TRUE.
-#' @param print_model_type A logical indicating whether to print the determined model type. Default is TRUE.
+#' @param model_variable A character string representing the model variable,
+#'   typically a formula or expression where variables may be aggregated or
+#'   segregated using '+' and '-'.
+#' @param var_agg_delimiter A character string representing the delimiter for
+#'   aggregated variables. Default is "|".
+#' @param trim A logical indicating whether to trim whitespace from the output.
+#'   Default is TRUE.
+#' @param print_model_type A logical indicating whether to print the determined
+#'   model type to the console. Default is TRUE.
 #'
-#' @return A list containing the processed dependent and independent variables.
+#' @return A list with two elements: 'dependent_var' containing the processed
+#'   dependent variable(s) and 'independent_var' containing the processed
+#'   independent variable(s).
+#'
 #' @examples
 #' \dontrun{
-#' get_dep_indep_vars("A + B - C")
+#'   # Aggregation
+#'   get_dep_indep_vars("TV_0_1_0+Sales_0_1_0")
+#'   # Remodel
+#'   get_dep_indep_vars("TV_0_1_0")
+#'   # Segregation
+#'   get_dep_indep_vars("TV-Sales_0_1_0")
+#'   # Aggregation & Segregation
+#'   get_dep_indep_vars("TV_0_1_0+-Sales_0_1_0")
+#'   # Aggregation & Segregation, segregation is evaluated first and then aggregation
+#'   get_dep_indep_vars("TV_0_1_0+Sales-Radio_0_1_0")
+#'   # Aggregation with alternate delimiter
+#'   get_dep_indep_vars("TV_0_1_0+Sales|Radio_0_1_0", var_agg_delimiter = "|")
 #' }
-#' @export
+#'
 get_dep_indep_vars <- function(model_variable, var_agg_delimiter = "|", trim = TRUE, print_model_type = TRUE) {
   # Determine model type based on the presence of characters + and -
   model_type <- if (!stringr::str_detect(model_variable, "[+-]")) {
