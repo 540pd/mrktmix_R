@@ -1,63 +1,87 @@
 #' Apply Adstock, Power, and Lag Transformation to a Data Frame
 #'
-#' This function applies the Adstock, Power, and Lag transformation to a given data frame.
+#' This function applies Adstock, Power, and Lag transformations to a data frame.
+#' It is designed to process input variables for market mix modeling, enhancing
+#' their utility for subsequent analysis.
 #'
-#' @param modeling_df A data frame containing the input variables.
-#' @param adstock The adstock rate for the transformation.
-#' @param power The power transformation to capture the non-linear effectiveness of marketing activity.
-#' @param lag The lag parameter for the time lag in the transformation.
+#' @param modeling_df A data frame containing the input variables. This should
+#'                    be structured with columns representing different marketing
+#'                    variables and rows representing time periods.
+#' @param adstock     The adstock rate for the transformation, which controls
+#'                    the degree of weight given to past values.
+#' @param power       The power transformation parameter, used to capture the
+#'                    non-linear effectiveness of marketing activities.
+#' @param lag         The lag parameter, specifying the time lag in the
+#'                    transformation to account for delayed effects.
 #'
-#' @return A data frame with Adstock, Power and Lag transformed values.
+#' @return            A transformed data frame with Adstock, Power, and Lag
+#'                    applied to the input variables.
 #'
-#' @importFrom dplyr lag
+#' @importFrom dplyr  lag
 #'
 #' @details
-#' The function applies the Adstock transformation using a recursive filtering
-#' method and raises the filtered values to the power specified. It then lags
-#' the result by the specified time lag.
+#' The function first applies the Adstock transformation using a recursive
+#' filtering method. It then raises the filtered values to the specified power,
+#' capturing non-linearities in the effect of marketing activities. Finally,
+#' it introduces a lag, shifting the transformed values by the specified
+#' time periods to account for delayed effects.
 #'
 #' @examples
 #' \dontrun{
+#'   # Basic usage with a sample data frame 'advertising'
 #'   compute_apl_values(advertising, adstock = 0.8, power = 2, lag = 1)
+#'
+#'   # Applying to a single column 'Sales' in 'advertising'
 #'   compute_apl_values(advertising[,"Sales",drop=F], adstock = 0.8, power = 2, lag = 1)
 #' }
 #'
-#' @export
 compute_apl_values <- function(modeling_df, adstock, power, lag) {
+  stopifnot(adstock>=0 & power>=0 & adstock<=1 & power<=1)
   transformed_df <- apply(stats::filter(modeling_df, adstock, method = "recursive")^power, 2, dplyr::lag, lag)
   dimnames(transformed_df) <- list(row.names(modeling_df), names(modeling_df))
   return(as.data.frame(transformed_df))
 }
 
-#' Apply Adstock, Power, and Lag Vectorized Transformation to a Data Frame
+#' Apply Vectorized Adstock, Power, and Lag Transformations to a Data Frame
 #'
-#' This function applies vectorized Adstock, Power, and Lag transformations to a given data frame.
+#' This function extends `compute_apl_values` to apply vectorized Adstock, Power,
+#' and Lag transformations to a data frame. It allows for the application of multiple
+#' transformation parameters simultaneously, creating a comprehensive transformed output.
 #'
-#' @param modeling_df A data frame containing the input variables.
-#' @param adstock A vector of adstock rates for the transformations.
-#' @param power A vector of power transformations to capture the non-linear effectiveness of marketing activity.
-#' @param lag A vector of lag parameters for the time lag in the transformations.
-#' @param apl_delimeter Delimiter used to separate Adstock, Power, and Lag values in resulting column names.
-#' @param delimeter Delimiter used to separate original column name and apl in output data frame.
+#' @inheritParams compute_apl_values
+#' @param apl_delimiter Delimiter used to separate Adstock, Power, and Lag values
+#'                      in resulting column names.
+#' @param delimiter Delimiter used to separate original column name and apl
+#'                  suffix in output data frame.
 #'
-#' @return A data frame with vectorized Adstock, Power, and Lag-transformed values.
+#' @return A data frame with each column transformed by all combinations of
+#'         Adstock, Power, and Lag parameters. The column names in the output
+#'         indicate the specific transformations applied.
 #'
 #' @importFrom purrr map
 #' @importFrom dplyr bind_cols
 #'
+#' @details
+#' The function iteratively applies combinations of Adstock, Power, and Lag
+#' transformations to the input data frame. Each column in the resulting data frame
+#' corresponds to one unique combination of these parameters. This function is
+#' particularly useful for scenarios where different sets of transformation
+#' parameters need to be evaluated simultaneously.
+#'
 #' @examples
 #' \dontrun{
-#'   generate_apl_dataframe(advertising, adstock = c(0.8, 0.9), power = c(2, 3), lag = c(1, 2))
+#'   # Applying vectorized transformations to 'advertising' data frame
+#'   generate_apl_dataframe(advertising, adstock = c(0.8, 0.9),
+#'                          power = c(2, 3), lag = c(1, 2))
 #' }
 #'
-#' @export
-generate_apl_dataframe <- function(modeling_df, adstock, power, lag, apl_delimeter = "_", delimeter = "|") {
+generate_apl_dataframe <- function(modeling_df, adstock, power, lag, apl_delimiter = "_", delimiter = "|") {
   transformed_df_list <- purrr::map(adstock, function(adstock_) {
     purrr::map(power, function(power_) {
       purrr::map(lag, function(lag_) {
         stats::setNames(
           list(compute_apl_values(modeling_df, adstock_, power_, lag_)),
-          paste(adstock_, power_, lag_, sep = apl_delimeter)
+          paste(adstock_, power_, lag_, sep = apl_delimiter)
         )
       })
     })
@@ -66,7 +90,7 @@ generate_apl_dataframe <- function(modeling_df, adstock, power, lag, apl_delimet
   transformed_df_list <- unlist(unlist(transformed_df_list, recursive = FALSE), recursive = FALSE)
 
   transformed_df_list <- lapply(transformed_df_list, function(transformed_df) {
-    names(transformed_df[[1]]) <- paste(names(transformed_df[[1]]), names(transformed_df), sep = delimeter)
+    names(transformed_df[[1]]) <- paste(names(transformed_df[[1]]), names(transformed_df), sep = delimiter)
     return(transformed_df)
   })
   return(dplyr::bind_cols(transformed_df_list))
@@ -74,22 +98,29 @@ generate_apl_dataframe <- function(modeling_df, adstock, power, lag, apl_delimet
 
 #' Apply Adstock, Power, and Lag Transformation to Multiple Variables
 #'
-#' This function applies the Adstock, Power, and Lag transformation to multiple variables in a given data frame.
+#' This function extends the functionality of `compute_apl_values` to apply Adstock,
+#' Power, and Lag transformations to multiple variables in a data frame. It allows
+#' for different transformation parameters to be specified for each variable.
 #'
 #' @param modeling_df A data frame containing the input variables.
 #' @param candidate_variables A list specifying adstock, power, and lag for each variable.
-#'
-#' Each element in `candidate_variables` should be a named vector with components:
-#' \describe{
-#'   \item{adstock}{Adstock rate for the transformation.}
-#'   \item{power}{Power transformation to capture non-linear effectiveness of marketing activity.}
-#'   \item{lag}{Lag parameter for the time lag in the transformation.}
-#' }
+#'        Each element in `candidate_variables` should be a named vector with components:
+#'        \describe{
+#'          \item{adstock}{Adstock rate for the transformation.}
+#'          \item{power}{Power transformation to capture non-linear effectiveness of marketing activity.}
+#'          \item{lag}{Lag parameter for the time lag in the transformation.}
+#'        }
 #'
 #' @return A data frame with Adstock, Power, and Lag transformed values for each variable.
 #'
 #' @importFrom dplyr bind_cols
 #' @importFrom purrr map
+#'
+#' @details
+#' The function iteratively applies the specified Adstock, Power, and Lag transformations
+#' to each variable in the `modeling_df` data frame based on the parameters defined in
+#' `candidate_variables`. This is useful for market mix modeling where different marketing
+#' channels may require different transformation parameters.
 #'
 #' @examples
 #' \dontrun{
@@ -102,6 +133,7 @@ generate_apl_dataframe <- function(modeling_df, adstock, power, lag, apl_delimet
 #' }
 #'
 #' @export
+#'
 apply_apl <- function(modeling_df, candidate_variables) {
   dplyr::bind_cols(
     purrr::map(names(candidate_variables), function(x) {
@@ -115,16 +147,29 @@ apply_apl <- function(modeling_df, candidate_variables) {
   )
 }
 
-#' Generate Adstock, Power, and Lag Combinations
+#' Generate Combinations of Adstock, Power, and Lag
 #'
-#' This function generates combinations of adstock, power, and lag based on specified constraints.
+#' This function is designed to:
+#' - Generate a range of adstock, power, and lag values based on specified start, end, and step values.
+#' - Create combinations of these values.
+#' - Apply additional logical constraints to these combinations if specified.
 #'
-#' @param adstock_start_end_step A named numeric vector specifying the start, end, and step for adstock.
-#' @param power_start_end_step A named numeric vector specifying the start, end, and step for power.
-#' @param lag_start_end_step A named numeric vector specifying the start, end, and step for lag.
-#' @param apl_constraints A list containing additional constraints for adstock, power, and lag.
+#' @param adstock_start_end_step A named list 'adstock' containing a named numeric
+#'                               vector with 'start', 'end', and 'step' values for
+#'                               the adstock rate.
+#' @param power_start_end_step A named list 'power' containing a named numeric
+#'                             vector with 'start', 'end', and 'step' values for
+#'                             the power transformation.
+#' @param lag_start_end_step A named list 'lag' containing a named numeric
+#'                           vector with 'start', 'end', and 'step' values for
+#'                           the lag.
+#' @param apl_constraints A list containing additional constraints for the
+#'                        combinations of adstock, power, and lag. Constraints
+#'                        should be specified as character strings representing
+#'                        logical conditions.
 #'
-#' @return A list of combinations for adstock, power, and lag.
+#' @return A list of all valid combinations of adstock, power, and lag that
+#'         meet the specified ranges and constraints.
 #'
 #' @examples
 #' \dontrun{
@@ -166,19 +211,27 @@ generate_apl_combinations <- function(adstock_start_end_step, power_start_end_st
 
 #' Generate Variable Combinations with Adstock, Power, and Lag
 #'
-#' This function generates combinations of adstock, power, and lag for multiple variables based on specified constraints.
+#' This function generates combinations of adstock, power, and lag for multiple
+#' variables based on specified constraints. It is designed to handle a variety
+#' of marketing variables, each with its own set of transformation parameters and constraints.
 #'
-#' @param variables_wt_apl_constraints A list containing named vectors for each variable with adstock, power, lag, and constraints.
-#'
-#' Each named vector should include the following components:
+#' @param variables_wt_apl_constraints A list containing named lists for each variable.
+#' Each named list for a variable should include the following components:
 #' \describe{
-#'   \item{adstock}{A named numeric vector specifying the start, end, and step for adstock.}
-#'   \item{power}{A named numeric vector specifying the start, end, and step for power.}
-#'   \item{lag}{A named numeric vector specifying the start, end, and step for lag.}
-#'   \item{constraints}{An optional character string specifying additional constraints for adstock and power.}
+#'   \item{adstock}{A named numeric vector specifying the start, end, and step
+#'                  for adstock, with names "start", "end", "step".}
+#'   \item{power}{A named numeric vector specifying the start, end, and step for
+#'                power, with names "start", "end", "step".}
+#'   \item{lag}{A named numeric vector specifying the start, end, and step for
+#'              lag, with names "start", "end", "step".}
+#'   \item{constraints}{An optional character string specifying additional
+#'                      constraints between adstock and power.}
 #' }
 #'
-#' @return A list of combinations for adstock, power, and lag for each variable.
+#' @return A list where each element represents a combination of adstock, power,
+#'         and lag parameters for a given variable. If multiple variables are
+#'         provided, the function returns a list of lists, with each inner list
+#'         containing combinations for a specific variable.
 #'
 #' @examples
 #' \dontrun{
@@ -196,10 +249,12 @@ generate_apl_combinations <- function(adstock_start_end_step, power_start_end_st
 #'       constraints = "adstock <= power"
 #'     )
 #'   )
-#'   generate_variable_combination(variables_wt_apl_constraints)
+#'   variable_combinations <- generate_variable_combination(variables_wt_apl_constraints)
+#'   print(variable_combinations)
 #' }
 #'
 #' @export
+#'
 generate_variable_combination <- function(variables_wt_apl_constraints) {
   variables_apl_combination <- lapply(variables_wt_apl_constraints, function(x)
     generate_apl_combinations(
