@@ -1,39 +1,41 @@
 #' Assemble Base Models
 #'
-#' This function assembles base models for linear regression, applying various
-#' statistical checks and thresholds.
+#' Assembles base models for linear regression by applying various statistical
+#' checks and thresholds. The function handles model creation, variable selection,
+#' and preliminary analysis, preparing the ground for more detailed modeling.
 #'
 #' @param candidate_predictors A list containing fixed and flexible candidate
-#'   predictors for the model. Each list must contain both a fixed and a flexible
-#'   list of variables.
-#' @param model_indep_df A dataframe of independent variables.
-#' @param model_dep_df A dataframe of the dependent variable.
+#'   predictors for the model. Each element in the list should be a list of variables,
+#'   categorized as 'fixed' and 'flexible'.
+#' @param model_indep_df A dataframe containing the independent variables.
+#' @param model_dep_df A dataframe containing the dependent variable.
 #' @param with_intercept Logical; if TRUE, an intercept is included in the model.
+#'   Default is TRUE.
 #' @param pos_vars A vector of variable names expected to have a positive
 #'   sign in the model.
 #' @param neg_vars A vector of variable names expected to have a negative
 #'   sign in the model.
 #' @param var_agg_delimiter A character string used as the delimiter to aggregate
-#'   variables.
+#'   variables. Default is "\\|".
 #' @param run_up_to_flexi_vars An integer representing the number of flexible
-#'   variables to consider up to.
+#'   variables to consider up to. Default is 0.
 #' @param vif_threshold A numeric threshold for the Variance Inflation Factor (VIF)
-#'   above which variables are dropped.
+#'   above which variables are dropped. Default is 10.
 #' @param pvalue_thresholds A named list containing p-value thresholds for
-#'   intercept, fixed, and flexible variables.
+#'   intercept, fixed, and flexible variables. Default is c(intercept = 0.15,
+#'   fixed = 0.15, flexible = 0.15).
 #' @param drop_pvalue_precision The precision for the p-value to drop variables.
+#'   Default is 2.
 #' @param discard_estimate_sign Logical; if TRUE, the sign of the estimate is
-#'   ignored when dropping variables.
+#'   ignored when dropping variables. Default is TRUE.
 #' @param drop_highest_estimate Logical; if TRUE, the variable with the highest
-#'   estimate is dropped.
+#'   estimate is dropped. Default is FALSE.
 #' @param get_model_object Logical; if TRUE, the function returns the linear model
-#'   object instead of the default list.
+#'   object instead of the default list. Default is FALSE.
 #'
-#' @return A list containing the base model and its statistics, or the model
-#'   object if `get_model_object` is TRUE.
-#' @importFrom stats lm as.formula
-#' @importFrom magrittr %>%
-#' @export
+#' @return Depending on the value of `get_model_object`, the function returns either
+#'   a list containing the base model and its statistics or the linear model object.
+#'
 #' @examples
 #' \dontrun{
 #'   candidate_predictors <- list(
@@ -42,19 +44,22 @@
 #'   )
 #'   independent_df <- data.frame(var1 = rnorm(100), var2 = rnorm(100))
 #'   dependent_df <- data.frame(dep_var = rnorm(100))
-#'
 #'   base_models <- assemble_base_models(
 #'     candidate_predictors = candidate_predictors,
 #'     model_indep_df = independent_df,
 #'     model_dep_df = dependent_df,
-#'     c("TV", "Radio"), c("Date2021_01_01","Date2021_01_08","Date2021_01_15")
-#'     # Additional parameters can be set as needed
+#'     pos_vars = c("var1", "var2"),
+#'     neg_vars = c("var3", "var4")
 #'   )
 #' }
+#'
+#' @importFrom stats lm as.formula
+#' @importFrom magrittr %>%
+#'
 assemble_base_models <- function(candidate_predictors, model_indep_df, model_dep_df,
                                  pos_vars, neg_vars,
                                  with_intercept = TRUE,
-                                 var_agg_delimiter = "\\|", run_up_to_flexi_vars = 0,
+                                 var_agg_delimiter = "|", run_up_to_flexi_vars = 0,
                                  vif_threshold = 10, pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
                                  drop_pvalue_precision = 2, discard_estimate_sign = TRUE, drop_highest_estimate = FALSE,
                                  get_model_object = FALSE) {
@@ -63,22 +68,11 @@ assemble_base_models <- function(candidate_predictors, model_indep_df, model_dep
   model_df_apl <- apply_apl(model_indep_df, unlist(unname(candidate_predictors), recursive = F))
   model_df_apl[is.na(model_df_apl)] <- 0
 
-  # Combine predictors info and calculate sum ignoring NA
-  # independent_variable_info <- dplyr::bind_rows(
-  #   dplyr::bind_rows(candidate_predictors[[1]], .id = "variable") %>%
-  #     dplyr::mutate(type = names(candidate_predictors[1])),
-  #   dplyr::bind_rows(candidate_predictors[[2]], .id = "variable") %>%
-  #     dplyr::mutate(type = names(candidate_predictors[2]))
-  # ) %>%
-  #   dplyr::bind_cols(sum = sapply(model_df_apl, sum, na.rm = TRUE))
   candidate_predictors_unlist<-unlist(candidate_predictors,recursive=F)
   independent_variable_info <- dplyr::bind_rows(candidate_predictors_unlist) %>%
     dplyr::mutate(var=names(candidate_predictors_unlist))%>%
     tidyr::separate("var", c("type", "variable"), sep = "\\.", extra = "merge") %>%
     dplyr::bind_cols(sum = sapply(model_df_apl, sum, na.rm = TRUE))
-  # %>%
-  #   bind_rows(data.frame(variable = "(Intercept)", sum = nrow(model_df_apl), type = "intercept"))
-
 
   # Add intercept info if necessary
   if (with_intercept) {
@@ -87,7 +81,6 @@ assemble_base_models <- function(candidate_predictors, model_indep_df, model_dep
 
   # Combine dependent and independent data
   modeling_df <- dplyr::bind_cols(model_dep_df, model_df_apl[rownames(model_df_apl) %in% rownames(model_dep_df),])
-
 
   # Fit linear model
   lm_model_formula <- as.formula(if (with_intercept) "Y ~ ." else "Y ~ . - 1")
@@ -105,23 +98,27 @@ assemble_base_models <- function(candidate_predictors, model_indep_df, model_dep
 
 #' Collate Base Models
 #'
-#' This function collates base models for linear regression from a list of candidate
-#' variable sets, using the `assemble_base_models` function for model assembly.
+#' Collates base models for linear regression from a list of candidate variable sets.
+#' Utilizes the `assemble_base_models` function for model assembly, applying
+#' various statistical checks and thresholds to each set of candidate predictors.
 #'
 #' @inheritParams assemble_base_models
 #' @param candidate_variables_list A list of lists, where each sublist contains
-#'   candidate predictors for a model.
-#' @param model_df A dataframe of independent variables for all models.
+#'   candidate predictors for a model. Each sublist should have a structure similar
+#'   to the `candidate_predictors` parameter in `assemble_base_models`.
+#' @param model_df A dataframe containing independent variables for all models.
 #' @param model_dep_df A dataframe of the dependent variable 'Y' for all models.
 #' @param pos_sign_variables A vector of variable names expected to have a positive
 #'   sign in the model.
 #' @param neg_sign_variables A vector of variable names expected to have a negative
 #'   sign in the model.
-#' @param base_variables A vector of variable names representing base. Its coefficient will be 1.
-#' @return A list containing the collated base models and associated statistics.
-#' @importFrom purrr map_dfr
+#' @param base_variables A vector of variable names representing base variables
+#'   whose coefficients are set to 1 in the model. Default is NA, indicating no base variables.
 #'
-#' @export
+#' @return A list containing collated base models and associated statistics.
+#'   The list includes model coefficients (`model_coef_all`), summary statistics
+#'   (`model_smry_all`), and the linear model objects (`lm_model_all`).
+#'
 #' @examples
 #' \dontrun{
 #'   candidate_variables_list <- list(
@@ -134,14 +131,19 @@ assemble_base_models <- function(candidate_predictors, model_indep_df, model_dep
 #'   results <- collate_base_models(
 #'     candidate_variables_list,
 #'     model_df = independent_df,
-#'     model_dep_df = dependent_df
-#'     # Additional parameters can be set as needed
+#'     model_dep_df = dependent_df,
+#'     pos_sign_variables = c("var1", "var2"),
+#'     neg_sign_variables = c("var3", "var4"),
+#'     base_variables = c("var1", "var2")
 #'   )
 #' }
+#'
+#' @importFrom purrr map_dfr
+#'
 collate_base_models <- function(candidate_variables_list, model_df, model_dep_df,
                                 pos_sign_variables, neg_sign_variables,  base_variables = NA,
                                 with_intercept = TRUE,
-                                var_agg_delimiter = "\\|", run_up_to_flexi_vars = 0,
+                                var_agg_delimiter = "|", run_up_to_flexi_vars = 0,
                                 vif_threshold = 10, pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
                                 drop_pvalue_precision = 2, discard_estimate_sign = TRUE, drop_highest_estimate = FALSE,
                                 get_model_object = FALSE) {
@@ -207,45 +209,56 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
 
 #' Collate Models
 #'
-#' This function extends the `collate_base_models` function to accommodate
-#' additional preprocessing of the dependent variable.
+#' Extends the `collate_base_models` function to include additional preprocessing
+#' of the dependent variable. This function collates models for linear regression
+#' from a list of candidate variable sets, applying preprocessing steps to the
+#' dependent variable and assembling the models.
 #'
 #' @inheritParams collate_base_models
 #' @param dep_var_info Information about the dependent variable, such as its
-#'   transformation and lag.
+#'   transformation and lag, provided in a specific format.
 #' @param pos_sign_variables A vector of variable names expected to have a positive
 #'   sign in the model.
 #' @param neg_sign_variables A vector of variable names expected to have a negative
 #'   sign in the model.
-#' @param mdl_start_date The start date to filter the data for model assembly.
-#' @param mdl_end_date The end date to filter the data for model assembly.
+#' @param mdl_start_date The start date for filtering the data before model assembly.
+#'   Should be of class `Date`. Default is NA.
+#' @param mdl_end_date The end date for filtering the data before model assembly.
+#'   Should be of class `Date`. Default is NA.
 #' @param apl_delimiter The delimiter used in variable names to separate APL components.
-#' @param var_apl_delimiter The delimiter used in-between variable names and apl.
+#'   Default is "_".
+#' @param var_apl_delimiter The delimiter used between variable names and APL attributes.
+#'   Default is "|".
 #'
 #' @return A list containing the collated models after filtering and preprocessing,
-#'   along with associated statistics.
+#'   along with associated statistics. This list includes details about the dependent
+#'   variable transformations, summary statistics, model coefficients, and linear model objects.
 #'
 #' @importFrom pbapply pbapply
 #' @export
 #' @examples
 #' \dontrun{
-#'   # Assuming 'date' is a column in 'independent_df' and 'dependent_df' containing
-#'   # Date class objects.
+#'   candidate_variables_list <- list(
+#'     list(fixed = c("var1"), flexible = c("var3")),
+#'     list(fixed = c("var2"), flexible = c("var4"))
+#'   )
+#'   independent_df <- data.frame(var1 = rnorm(100), var2 = rnorm(100))
+#'   dependent_df <- data.frame(Y = rnorm(100))
+#'   dep_info <- list(transformation = "log", lag = 1)
 #'   filter_start <- as.Date("2000-01-01")
 #'   filter_end <- as.Date("2005-12-31")
-#'
-#'   dep_info <- list(transformation = "log", lag = 1)
 #'
 #'   results <- collate_models(
 #'     candidate_variables_list,
 #'     model_df = independent_df,
 #'     model_dep_df = dependent_df,
 #'     dep_var_info = dep_info,
-#'     filter_start_date = filter_start,
-#'     filter_end_date = filter_end
+#'     mdl_start_date = filter_start,
+#'     mdl_end_date = filter_end
 #'     # Additional parameters can be set as needed
 #'   )
 #' }
+#'
 collate_models<-function(candidate_variables_list, model_df, dep_var_info,
                          pos_sign_variables, neg_sign_variables,
                          mdl_start_date=NA, mdl_end_date=NA,
@@ -255,9 +268,10 @@ collate_models<-function(candidate_variables_list, model_df, dep_var_info,
                          vif_threshold = 10, pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
                          drop_pvalue_precision = 2, discard_estimate_sign = TRUE, drop_highest_estimate = FALSE,
                          get_model_object = FALSE){
-
   dep_apl_df_list<-generate_model_dependent(dep_var_info,model_df, apl_delimiter , var_apl_delimiter)
   dep_apl_df_list[[1]] <- dep_apl_df_list[[1]] %>% tibble::rownames_to_column("dependent_id")
+
+  dep_apl_df_list[[2]] <-lapply(dep_apl_df_list[[2]],  function(x) data.frame(Y=rowSums(x)))
 
   if(!is.na(mdl_start_date)){
     dep_apl_df_list[[2]]<-purrr::map(dep_apl_df_list[[2]], function(x) x[rownames(x)>=mdl_start_date,,drop=F])
@@ -268,9 +282,12 @@ collate_models<-function(candidate_variables_list, model_df, dep_var_info,
 
   #Aggregate independent variable
   candidate_variables_list_variable<-unique(unlist(lapply(unlist(candidate_variables_list, recursive = F), names)))
-  model_df_rel<-aggregate_columns(model_df, candidate_variables_list_variable, delimeter = var_agg_delimiter)
+  if(any(!is.na(base_variables))){
+    candidate_variables_list_variable<-unique(c(candidate_variables_list_variable,base_variables))
+  }
+  model_df_rel<-aggregate_columns(model_df, candidate_variables_list_variable, delimiter = var_agg_delimiter)
 
-  model_result <- purrr::map(dep_apl_df_list[[2]],~collate_base_models(candidate_variables_list,  model_df_rel, .x %>% dplyr::rename(Y = names(.x)[1]),
+  model_result <- purrr::map(dep_apl_df_list[[2]],~collate_base_models(candidate_variables_list,  model_df_rel, .x ,
                                                                        pos_sign_variables , neg_sign_variables ,
                                                                        base_variables, with_intercept,
                                                                        var_agg_delimiter , run_up_to_flexi_vars,
@@ -279,8 +296,8 @@ collate_models<-function(candidate_variables_list, model_df, dep_var_info,
                                                                        get_model_object ))
 
   model_coef_all <- purrr::map_dfr(model_result, 1, .id = "dependent_id") %>%
-                       dplyr::mutate(contri = .data[["Estimate"]] * .data[["sum"]],
-                                     contri_perc = .data[["contri"]]/.data[["dep_sum"]]*100)
+    dplyr::mutate(contri = .data[["Estimate"]] * .data[["sum"]],
+                  contri_perc = .data[["contri"]]/.data[["dep_sum"]]*100)
 
   model_smry_all <- purrr::map_dfr(model_result, 2, .id = "dependent_id")
 
