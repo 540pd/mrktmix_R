@@ -13,26 +13,41 @@ cleanse_model_singularity(
 )
 }
 \arguments{
-\item{lm_model}{The linear regression model to be cleansed.}
+\item{lm_model}{The linear regression model (of class \code{\link[stats]{lm}})
+to be cleansed.}
 
-\item{model_data}{Data used for modeling i.e. lm_model}
+\item{model_data}{The data frame used to fit \code{lm_model}. It must
+contain all variables used in the model.}
 
-\item{flexible_variables}{A character vector specifying the flexible variables in the model.}
+\item{flexible_variables}{A character vector specifying the names of
+flexible variables in the model. Only these
+variables are considered for removal.}
 
-\item{round_digits}{Number of digits to round to identify order of variables dropped with singular dependencies.}
+\item{round_digits}{Integer value indicating the number of digits for
+rounding in the process of identifying order of
+variables to be dropped due to singular dependencies.}
 
-\item{verbose}{Logical; if TRUE, prints the variable being dropped in each iteration.}
+\item{verbose}{Logical; if TRUE, the function prints the name of the
+variable being dropped in each iteration.}
 }
 \value{
-A linear regression model with singular variables removed.
+An updated linear regression model object of the same class as
+\code{lm_model}, with singular variables removed.
 }
 \description{
-This function removes singular variables from a linear regression model to improve model stability.
+Removes singular variables from a linear regression model to enhance model
+stability. This is particularly useful when dealing with multicollinearity
+or redundant predictors in a model.
 }
 \examples{
 \dontrun{
+  advertising <- data.frame(tv = runif(10), radio = runif(10), newspaper = runif(10))
+  event <- data.frame(event1 = runif(10), event2 = runif(10))
+  Sales <- runif(10)
+
   lm_model <- lm(Sales ~ ., data = cbind(advertising, event))
-  cleanse_model_singularity(lm_model, names(event), round_digits = 2, verbose = TRUE)
+  cleansed_model <- cleanse_model_singularity(lm_model, cbind(advertising, event),
+   names(event), round_digits = 2, verbose = TRUE)
 }
 
 }
