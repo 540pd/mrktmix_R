@@ -2,20 +2,46 @@
 % Please edit documentation in R/model_base.R
 \name{determine_vif_flag}
 \alias{determine_vif_flag}
-\title{Determine VIF Flag}
+\title{Determine VIF Flag for Predictors}
 \usage{
 determine_vif_flag(type, vif, vif_threshold)
 }
 \arguments{
-\item{type}{Character string indicating the type of the variable (either 'fixed' or 'flexible').}
+\item{type}{Character string indicating the type of the variable.
+Options are 'fixed' or 'flexible'. The function applies special
+logic if there is only one 'fixed' variable.}
 
-\item{vif}{Numeric VIF value for the predictor.}
+\item{vif}{Numeric VIF value for the predictor. This value is used to assess
+whether the VIF exceeds the threshold.}
 
-\item{vif_threshold}{Threshold above which the VIF flag should be triggered.}
+\item{vif_threshold}{Numeric value specifying the threshold above which the
+VIF flag should be triggered.}
 }
 \value{
-Logical; TRUE if the VIF is greater than the threshold. If there is only one 'fixed' variable and the VIF is infinite, then it will return FALSE.
+A logical value; TRUE if the VIF is greater than the threshold,
+except when there is only one 'fixed' variable and the VIF is
+infinite, in which case it returns FALSE.
 }
 \description{
-This function determines the VIF flag for predictors based on their type and given VIF value.
+This function evaluates the Variance Inflation Factor (VIF) for predictors and
+determines if it exceeds a specified threshold. It accounts for special cases
+based on the type of the variable.
+}
+\details{
+The function uses the following logic:
+\itemize{
+\item If the \code{type} is 'fixed' and there is only one such variable with an
+infinite VIF, it returns FALSE. This accounts for the scenario where a
+single fixed variable should not trigger a flag.
+\item In all other cases, it checks if the \code{vif} exceeds the \code{vif_threshold}.
+If so, it returns TRUE, indicating that the VIF flag should be triggered.
+}
+}
+\examples{
+\dontrun{
+  determine_vif_flag("fixed", Inf, 5)    # Returns FALSE
+  determine_vif_flag("flexible", 10, 5)  # Returns TRUE
+  determine_vif_flag("fixed", 4, 5)      # Returns FALSE
+}
+
 }
