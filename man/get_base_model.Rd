@@ -21,65 +21,66 @@ get_base_model(
 )
 }
 \arguments{
-\item{lm_model}{The linear model object to be processed.}
+\item{lm_model}{A linear model object (of class \code{\link[stats]{lm}}) to be processed.}
 
-\item{model_data}{Data used for modeling i.e. lm_model}
+\item{model_data}{Data used for fitting \code{lm_model}.}
 
-\item{independent_var_info}{A data frame containing information about the
-independent variables in the model. It should contain columns for the variable,
-adstock, power, lag, and the type of variable being used in the model.}
+\item{independent_var_info}{A data frame with information about independent
+variables in the model. It should contain columns for variable names, adstock,
+power, lag, and the type of variable (e.g., "flexible", "fixed").}
 
-\item{pos_vars}{Character vector specifying which variables are expected to have
-a positive relationship with the response.}
+\item{pos_vars}{Character vector of variables expected to have a positive
+relationship with the response.}
 
-\item{neg_vars}{Character vector specifying which variables are expected to have
-a negative relationship with the response.}
+\item{neg_vars}{Character vector of variables expected to have a negative
+relationship with the response.}
 
 \item{var_agg_delimiter}{Delimiter used in variable names for aggregation
 (default is "\\|").}
 
-\item{run_up_to_flexi_vars}{Integer indicating how many "flexible" variables to
-consider for retention in the final model (default is 10). This condition is
-checked only after a successful model is generated.}
+\item{run_up_to_flexi_vars}{Integer indicating the number of "flexible"
+variables to consider for retention (default is 10).}
 
-\item{vif_threshold}{The threshold for the variance inflation factor (VIF) above
-which variables will be considered for removal (default is 10).}
+\item{vif_threshold}{Threshold for VIF above which variables are considered
+for removal (default is 10).}
 
 \item{pvalue_thresholds}{Named numeric vector of p-value thresholds for
-"intercept", "fixed", and "flexible" variables (default is
-c(intercept = 0.15, fixed = 0.15, flexible = 0.15)).}
+different types of variables (default is c(intercept = 0.15, fixed = 0.15, flexible = 0.15)).}
 
-\item{drop_pvalue_precision}{Integer indicating the number of decimal places to
-round p-values to for the decision process (default is 2). This dilutes the
-p-values' weightage in choosing which variable to be dropped.}
+\item{drop_pvalue_precision}{Integer for rounding p-values in the decision
+process (default is 2).}
 
-\item{discard_estimate_sign}{Logical indicating whether to disregard the sign of
-estimates in the decision process (default is TRUE). This guides if the sign of
-the Estimate should be considered while dropping a variable.}
+\item{discard_estimate_sign}{Logical; if TRUE, the sign of estimates is
+disregarded in the decision process (default is TRUE).}
 
-\item{drop_highest_estimate}{Logical indicating whether to always drop the
-variable with the highest estimate (default is FALSE).}
+\item{drop_highest_estimate}{Logical; if TRUE, always drop the variable
+with the highest estimate (default is FALSE).}
 
-\item{get_model_object}{Logical indicating whether to return the final model
-object (default is FALSE).}
+\item{get_model_object}{Logical; if TRUE, returns the final model object
+(default is FALSE).}
 }
 \value{
-A list containing the data frame of model coefficients, the data frame of
-model summary statistics, and optionally the final model object if
-get_model_object is TRUE.
+A list containing the data frame of model coefficients, the data frame
+of model summary statistics, and optionally the final model object if
+\code{get_model_object} is TRUE.
 }
 \description{
-This function iteratively updates a linear model by dropping variables based on
-several criteria such as high p-values, high variance inflation factors (VIF),
-and the expected sign of the coefficients until no more variables meet the
-criteria for exclusion.
+Iteratively updates a linear model by dropping variables based on criteria such as
+high p-values, high VIF, and expected sign of coefficients. The process continues
+until no more variables meet the criteria for exclusion, refining the model.
 }
 \examples{
 \dontrun{
-# lm_model is an lm object that has been fitted previously.
-# independent_var_info is a data frame with variables and types.
-# Example usage:
-get_base_model(lm_model, independent_var_info, pos_vars = c("var1", "var2"),
-               neg_vars = c("var3", "var4"), get_model_object = TRUE)
+  advertising <- data.frame(tv = runif(10), radio = runif(10), newspaper = runif(10),
+   sales = runif(10))
+  event <- data.frame(event1 = runif(10), event2 = runif(10))
+  lm_model <- lm(sales ~ tv + radio + newspaper + event1 + event2, data = cbind(advertising, event))
+  independent_var_info <- data.frame(variable = c("tv", "radio", "newspaper", "event1", "event2"),
+                                     type = c("fixed", "fixed", "fixed", "flexible", "flexible"),
+                                     adstock = rep(NA, 5), power = rep(NA, 5), lag = rep(NA, 5))
+  base_model <- get_base_model(lm_model, cbind(advertising, event), independent_var_info,
+                               pos_vars = c("tv", "radio"), neg_vars = c("newspaper"),
+                               get_model_object = TRUE)
 }
+
 }
