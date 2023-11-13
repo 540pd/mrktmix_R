@@ -10,7 +10,6 @@ apply_apl(modeling_df, candidate_variables)
 \item{modeling_df}{A data frame containing the input variables.}
 
 \item{candidate_variables}{A list specifying adstock, power, and lag for each variable.
-
 Each element in \code{candidate_variables} should be a named vector with components:
 \describe{
 \item{adstock}{Adstock rate for the transformation.}
@@ -22,7 +21,15 @@ Each element in \code{candidate_variables} should be a named vector with compone
 A data frame with Adstock, Power, and Lag transformed values for each variable.
 }
 \description{
-This function applies the Adstock, Power, and Lag transformation to multiple variables in a given data frame.
+This function extends the functionality of \code{compute_apl_values} to apply Adstock,
+Power, and Lag transformations to multiple variables in a data frame. It allows
+for different transformation parameters to be specified for each variable.
+}
+\details{
+The function iteratively applies the specified Adstock, Power, and Lag transformations
+to each variable in the \code{modeling_df} data frame based on the parameters defined in
+\code{candidate_variables}. This is useful for market mix modeling where different marketing
+channels may require different transformation parameters.
 }
 \examples{
 \dontrun{
