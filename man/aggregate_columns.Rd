@@ -4,24 +4,32 @@
 \alias{aggregate_columns}
 \title{Aggregate Columns in a Data Frame}
 \usage{
-aggregate_columns(modeling_df, aggregated_variables, delimeter = "\\\\|")
+aggregate_columns(modeling_df, aggregated_variables, delimiter = "|")
 }
 \arguments{
 \item{modeling_df}{A data frame containing the input variables.}
 
-\item{aggregated_variables}{A character vector specifying the columns to aggregate.}
+\item{aggregated_variables}{A character vector specifying the columns to
+aggregate. The columns are expected to be delimited strings representing
+the individual variables to aggregate.}
 
-\item{delimeter}{Delimiter used to find individual variables for aggregated_variables.}
+\item{delimiter}{A string used as a delimiter to split the names in
+\code{aggregated_variables}. Default is "|".}
 }
 \value{
-A data frame with aggregated values.
+A data frame with columns specified in \code{aggregated_variables} aggregated.
 }
 \description{
-This function aggregates specified columns in a data frame and returns a new data frame.
+Aggregates specified columns in a data frame and returns a new data frame with
+these aggregated values. It takes a character vector of column names,
+possibly representing aggregated variables separated by a delimiter, and
+computes the sum of these variables row-wise.
 }
 \examples{
 \dontrun{
-  aggregate_columns(advertising, c("Sales", "TV|Radio|Newspaper"), delimeter = "\\\\|")
+  advertising <- data.frame(tv = runif(10), radio = runif(10), newspaper = runif(10),
+   sales = runif(10))
+  aggregate_columns(advertising, c("Sales", "TV|Radio|Newspaper"), delimiter = "|")
 }
 
 }
