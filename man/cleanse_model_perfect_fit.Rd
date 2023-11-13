@@ -13,31 +13,42 @@ cleanse_model_perfect_fit(
 )
 }
 \arguments{
-\item{lm_model}{The linear regression model to be cleansed.}
+\item{lm_model}{The linear regression model (of class \code{\link[stats]{lm}})
+to be cleansed from variables causing a perfect fit.}
 
-\item{model_data}{Data used for modeling i.e. lm_model.}
+\item{model_data}{The data frame used to fit \code{lm_model}. It must
+contain all the variables used in the model.}
 
-\item{flexible_variables}{A character vector specifying the flexible variables
-in the model.}
+\item{flexible_variables}{A character vector specifying the names of
+flexible variables in the model. Only these
+variables are considered for removal.}
 
-\item{drop_highest_estimate}{Logical indicating whether to drop the variable
-with the highest estimate.}
+\item{drop_highest_estimate}{Logical; if TRUE, the variable with the highest
+(or lowest, if \code{ignore_estimate_sign} is TRUE)
+estimate is removed from the model.}
 
-\item{ignore_estimate_sign}{Logical indicating whether to ignore the sign of
-the estimate while dropping variables.}
+\item{ignore_estimate_sign}{Logical; if TRUE, the absolute value of the
+estimates is considered in determining which
+variable to drop.}
 }
 \value{
-A linear regression model with variables causing a perfect fit
-removed.
+An updated linear regression model object of the same class as
+\code{lm_model}, with variables causing a perfect fit removed.
 }
 \description{
-This function removes variables causing a perfect fit in a linear regression
-model, which can lead to issues like over-fitting.
+Removes variables causing a perfect fit in a linear regression model to prevent
+issues like overfitting. This is particularly useful in scenarios where a model
+might be overly complex due to too many variables or multicollinearity.
 }
 \examples{
 \dontrun{
+  advertising <- data.frame(tv = runif(10), radio = runif(10),
+   newspaper = runif(10))
+  event <- data.frame(event1 = runif(10), event2 = runif(10))
+  Sales <- runif(10)
+
   lm_model <- lm(Sales ~ ., data = cbind(advertising, event))
-  cleanse_model_perfect_fit(lm_model, model_data = cbind(advertising, event),
+  cleansed_model <- cleanse_model_perfect_fit(lm_model, model_data = cbind(advertising, event),
     flexible_variables = names(event), drop_highest_estimate = TRUE,
     ignore_estimate_sign = TRUE)
 }
