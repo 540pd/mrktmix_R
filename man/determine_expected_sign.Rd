@@ -2,22 +2,57 @@
 % Please edit documentation in R/model_base.R
 \name{determine_expected_sign}
 \alias{determine_expected_sign}
-\title{Determine Expected Sign of Coefficients}
+\title{Determine the Expected Sign of Model Coefficients}
 \usage{
 determine_expected_sign(variable, pos_vars, neg_vars, var_agg_delimiter)
 }
 \arguments{
-\item{variable}{Character string of variable names.}
+\item{variable}{A character string representing the name of the variable
+whose coefficient sign is to be determined. For aggregated
+variable names, the function segregates the parts based on
+the provided delimiter.}
 
-\item{pos_vars}{Character vector of variables expected to have a positive sign.}
+\item{pos_vars}{A character vector of variable names that are expected to
+have a positive impact. Coefficients of these variables
+are expected to be positive.}
 
-\item{neg_vars}{Character vector of variables expected to have a negative sign.}
+\item{neg_vars}{A character vector of variable names that are expected to
+have a negative impact. Coefficients of these variables
+are expected to be negative.}
 
-\item{var_agg_delimiter}{Character string delimiter used in variable names for aggregation.}
+\item{var_agg_delimiter}{A character string delimiter used in the variable
+names for aggregation purposes. This delimiter
+is used to split the variable names if they are
+aggregated.}
 }
 \value{
-Logical; TRUE if the variable is expected to have a positive sign, FALSE if expected to have a negative sign, NA otherwise.
+A logical value; returns TRUE if all segregated parts of the variable
+are expected to have a positive sign, FALSE if all are expected to
+have a negative sign. If the segregated parts of the variable do not
+uniformly align with either positive or negative expectations, the
+function returns NA.
 }
 \description{
-Determines the expected sign (positive or negative) of model coefficients.
+This function assesses whether the coefficients of given variables are
+expected to be positive or negative. It is particularly useful for variables
+that may have aggregated names, determining the expected sign based on the
+segregation of each part of the variable name.
+}
+\details{
+In the case of an aggregated variable (a variable name composed of multiple
+parts separated by the delimiter), the function determines the expected sign
+based on the segregation of each part. The output will be TRUE only if all
+segregated parts have an expected positive sign; similarly, it will be FALSE
+only if all parts have an expected negative sign. If there is any inconsistency
+among the segregated parts, the expected sign will be NA.
+}
+\examples{
+\dontrun{
+  pos_vars <- c("sales", "marketing")
+  neg_vars <- c("costs", "returns")
+  determine_expected_sign("sales|Q1", pos_vars, neg_vars, "|") # Returns TRUE
+  determine_expected_sign("costs|Q1", pos_vars, neg_vars, "|") # Returns FALSE
+  determine_expected_sign("sales|other", pos_vars, neg_vars, "|") # Returns NA
+}
+
 }
