@@ -2,18 +2,34 @@
 % Please edit documentation in R/model_base.R
 \name{summarize_model}
 \alias{summarize_model}
-\title{Summarize Model Statistics}
+\title{Summarize Key Statistics from a Linear Model}
 \usage{
 summarize_model(model_summary, loop_id)
 }
 \arguments{
-\item{model_summary}{A summary object from a linear model.}
+\item{model_summary}{A summary object from a linear model, typically
+obtained using \code{summary(lm_model)} where \code{lm_model}
+is a linear model object.}
 
-\item{loop_id}{Identifier for the model iteration.}
+\item{loop_id}{An identifier for the model iteration, allowing for tracking
+and comparison of model statistics across different model runs.}
 }
 \value{
-A tibble with model summary statistics including loop_id, sigma, r_squared, adj_r_squared, and residuals.
+A \code{tibble} containing key model summary statistics including:
+\code{loop_id} (model iteration identifier), \code{sigma} (residual standard error),
+\code{r_squared} (R-squared value), \code{adj_r_squared} (adjusted R-squared value),
+and \code{residuals_all} (list of all residuals from the model).
 }
 \description{
-Summarizes important statistics from a linear model.
+This function extracts and summarizes important statistics from a linear
+model summary object. It is useful for consolidating key model metrics
+into a concise format.
+}
+\examples{
+\dontrun{
+  lm_model <- lm(mpg ~ wt + qsec, data = mtcars)
+  model_sum <- summary(lm_model)
+  summarize_model(model_sum, loop_id = 1)
+}
+
 }
