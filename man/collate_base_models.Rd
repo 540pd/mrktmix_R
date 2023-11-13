@@ -8,10 +8,11 @@ collate_base_models(
   candidate_variables_list,
   model_df,
   model_dep_df,
-  with_intercept = TRUE,
   pos_sign_variables,
   neg_sign_variables,
-  var_agg_delimiter = "\\\\|",
+  base_variables = NA,
+  with_intercept = TRUE,
+  var_agg_delimiter = "|",
   run_up_to_flexi_vars = 0,
   vif_threshold = 10,
   pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
@@ -23,13 +24,12 @@ collate_base_models(
 }
 \arguments{
 \item{candidate_variables_list}{A list of lists, where each sublist contains
-candidate predictors for a model.}
+candidate predictors for a model. Each sublist should have a structure similar
+to the \code{candidate_predictors} parameter in \code{assemble_base_models}.}
 
-\item{model_df}{A dataframe of independent variables for all models.}
+\item{model_df}{A dataframe containing independent variables for all models.}
 
 \item{model_dep_df}{A dataframe of the dependent variable 'Y' for all models.}
-
-\item{with_intercept}{Logical; if TRUE, an intercept is included in the model.}
 
 \item{pos_sign_variables}{A vector of variable names expected to have a positive
 sign in the model.}
@@ -37,35 +37,46 @@ sign in the model.}
 \item{neg_sign_variables}{A vector of variable names expected to have a negative
 sign in the model.}
 
+\item{base_variables}{A vector of variable names representing base variables
+whose coefficients are set to 1 in the model. Default is NA, indicating no base variables.}
+
+\item{with_intercept}{Logical; if TRUE, an intercept is included in the model.
+Default is TRUE.}
+
 \item{var_agg_delimiter}{A character string used as the delimiter to aggregate
-variables.}
+variables. Default is "\\|".}
 
 \item{run_up_to_flexi_vars}{An integer representing the number of flexible
-variables to consider up to.}
+variables to consider up to. Default is 0.}
 
 \item{vif_threshold}{A numeric threshold for the Variance Inflation Factor (VIF)
-above which variables are dropped.}
+above which variables are dropped. Default is 10.}
 
 \item{pvalue_thresholds}{A named list containing p-value thresholds for
-intercept, fixed, and flexible variables.}
+intercept, fixed, and flexible variables. Default is c(intercept = 0.15,
+fixed = 0.15, flexible = 0.15).}
 
-\item{drop_pvalue_precision}{The precision for the p-value to drop variables.}
+\item{drop_pvalue_precision}{The precision for the p-value to drop variables.
+Default is 2.}
 
 \item{discard_estimate_sign}{Logical; if TRUE, the sign of the estimate is
-ignored when dropping variables.}
+ignored when dropping variables. Default is TRUE.}
 
 \item{drop_highest_estimate}{Logical; if TRUE, the variable with the highest
-estimate is dropped.}
+estimate is dropped. Default is FALSE.}
 
 \item{get_model_object}{Logical; if TRUE, the function returns the linear model
-object instead of the default list.}
+object instead of the default list. Default is FALSE.}
 }
 \value{
-A list containing the collated base models and associated statistics.
+A list containing collated base models and associated statistics.
+The list includes model coefficients (\code{model_coef_all}), summary statistics
+(\code{model_smry_all}), and the linear model objects (\code{lm_model_all}).
 }
 \description{
-This function collates base models for linear regression from a list of candidate
-variable sets, using the \code{assemble_base_models} function for model assembly.
+Collates base models for linear regression from a list of candidate variable sets.
+Utilizes the \code{assemble_base_models} function for model assembly, applying
+various statistical checks and thresholds to each set of candidate predictors.
 }
 \examples{
 \dontrun{
@@ -79,8 +90,11 @@ variable sets, using the \code{assemble_base_models} function for model assembly
   results <- collate_base_models(
     candidate_variables_list,
     model_df = independent_df,
-    model_dep_df = dependent_df
-    # Additional parameters can be set as needed
+    model_dep_df = dependent_df,
+    pos_sign_variables = c("var1", "var2"),
+    neg_sign_variables = c("var3", "var4"),
+    base_variables = c("var1", "var2")
   )
 }
+
 }
