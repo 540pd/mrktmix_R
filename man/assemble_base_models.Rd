@@ -11,7 +11,7 @@ assemble_base_models(
   pos_vars,
   neg_vars,
   with_intercept = TRUE,
-  var_agg_delimiter = "\\\\|",
+  var_agg_delimiter = "|",
   run_up_to_flexi_vars = 0,
   vif_threshold = 10,
   pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
@@ -23,12 +23,12 @@ assemble_base_models(
 }
 \arguments{
 \item{candidate_predictors}{A list containing fixed and flexible candidate
-predictors for the model. Each list must contain both a fixed and a flexible
-list of variables.}
+predictors for the model. Each element in the list should be a list of variables,
+categorized as 'fixed' and 'flexible'.}
 
-\item{model_indep_df}{A dataframe of independent variables.}
+\item{model_indep_df}{A dataframe containing the independent variables.}
 
-\item{model_dep_df}{A dataframe of the dependent variable.}
+\item{model_dep_df}{A dataframe containing the dependent variable.}
 
 \item{pos_vars}{A vector of variable names expected to have a positive
 sign in the model.}
@@ -36,38 +36,42 @@ sign in the model.}
 \item{neg_vars}{A vector of variable names expected to have a negative
 sign in the model.}
 
-\item{with_intercept}{Logical; if TRUE, an intercept is included in the model.}
+\item{with_intercept}{Logical; if TRUE, an intercept is included in the model.
+Default is TRUE.}
 
 \item{var_agg_delimiter}{A character string used as the delimiter to aggregate
-variables.}
+variables. Default is "\\|".}
 
 \item{run_up_to_flexi_vars}{An integer representing the number of flexible
-variables to consider up to.}
+variables to consider up to. Default is 0.}
 
 \item{vif_threshold}{A numeric threshold for the Variance Inflation Factor (VIF)
-above which variables are dropped.}
+above which variables are dropped. Default is 10.}
 
 \item{pvalue_thresholds}{A named list containing p-value thresholds for
-intercept, fixed, and flexible variables.}
+intercept, fixed, and flexible variables. Default is c(intercept = 0.15,
+fixed = 0.15, flexible = 0.15).}
 
-\item{drop_pvalue_precision}{The precision for the p-value to drop variables.}
+\item{drop_pvalue_precision}{The precision for the p-value to drop variables.
+Default is 2.}
 
 \item{discard_estimate_sign}{Logical; if TRUE, the sign of the estimate is
-ignored when dropping variables.}
+ignored when dropping variables. Default is TRUE.}
 
 \item{drop_highest_estimate}{Logical; if TRUE, the variable with the highest
-estimate is dropped.}
+estimate is dropped. Default is FALSE.}
 
 \item{get_model_object}{Logical; if TRUE, the function returns the linear model
-object instead of the default list.}
+object instead of the default list. Default is FALSE.}
 }
 \value{
-A list containing the base model and its statistics, or the model
-object if \code{get_model_object} is TRUE.
+Depending on the value of \code{get_model_object}, the function returns either
+a list containing the base model and its statistics or the linear model object.
 }
 \description{
-This function assembles base models for linear regression, applying various
-statistical checks and thresholds.
+Assembles base models for linear regression by applying various statistical
+checks and thresholds. The function handles model creation, variable selection,
+and preliminary analysis, preparing the ground for more detailed modeling.
 }
 \examples{
 \dontrun{
@@ -77,13 +81,13 @@ statistical checks and thresholds.
   )
   independent_df <- data.frame(var1 = rnorm(100), var2 = rnorm(100))
   dependent_df <- data.frame(dep_var = rnorm(100))
-
   base_models <- assemble_base_models(
     candidate_predictors = candidate_predictors,
     model_indep_df = independent_df,
     model_dep_df = dependent_df,
-    c("TV", "Radio"), c("Date2021_01_01","Date2021_01_08","Date2021_01_15")
-    # Additional parameters can be set as needed
+    pos_vars = c("var1", "var2"),
+    neg_vars = c("var3", "var4")
   )
 }
+
 }
