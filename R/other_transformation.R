@@ -273,6 +273,10 @@ decompose_model_component <- function(variables_wt_weights, model_df,
 generate_model_dependent <- function(var_info, model_df,
                                      apl_delimiter = "_",
                                      var_apl_delimiter = "|", var_agg_delimiter = "|") {
+  if(is.vector(var_info) && is.character(var_info)){
+    var_info <- setNames(sapply(model_df[,var_info, drop=FALSE],sum, na.rm=T),paste(var_info, var_apl_delimiter,0,apl_delimiter,1,apl_delimiter,0, sep =""))
+  }
+  
   if (is.vector(var_info) && is.numeric(var_info) && all(!is.na(names(var_info)))) {
 
     # Dependent Data - create aggregation if required
