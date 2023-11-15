@@ -260,8 +260,8 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
 #' }
 #'
 collate_models<-function(candidate_variables_list, model_df, dep_var_info,
-                        with_intercept = TRUE,
-                        base_variables = NA,
+                        with_intercept,
+                        base_variables,
                          run_up_to_flexi_vars = NA,
                          pos_sign_variables = NA, neg_sign_variables = NA,
                          mdl_start_date=NA, mdl_end_date=NA,
