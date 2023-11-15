@@ -260,14 +260,16 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
 #' }
 #'
 collate_models<-function(candidate_variables_list, model_df, dep_var_info,
-                         pos_sign_variables, neg_sign_variables,
+                        with_intercept = TRUE,
+                        base_variables = NA,
+                         run_up_to_flexi_vars = NA,
+                         pos_sign_variables = NA, neg_sign_variables = NA,
                          mdl_start_date=NA, mdl_end_date=NA,
-                         base_variables = NA, with_intercept = TRUE,
                          var_agg_delimiter = "|",apl_delimiter = "_",var_apl_delimiter = "|",
-                         run_up_to_flexi_vars = 100,
                          vif_threshold = 10, pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
-                         drop_pvalue_precision = 2, discard_estimate_sign = TRUE, drop_highest_estimate = FALSE,
+                         drop_pvalue_precision = 2, drop_discard_estimate_sign = TRUE, drop_highest_estimate = FALSE,
                          get_model_object = FALSE){
+
   dep_apl_df_list<-generate_model_dependent(dep_var_info,model_df, apl_delimiter , var_apl_delimiter)
   dep_apl_df_list[[1]] <- dep_apl_df_list[[1]] %>% tibble::rownames_to_column("dependent_id")
 
@@ -287,12 +289,16 @@ collate_models<-function(candidate_variables_list, model_df, dep_var_info,
   }
   model_df_rel<-aggregate_columns(model_df, candidate_variables_list_variable, delimiter = var_agg_delimiter)
 
+  if(is.na(run_up_to_flexi_vars)){
+    run_up_to_flexi_vars <- 1000000 # Assuming that there won't be any regression with more than 1 million independent variables
+  }
+
   model_result <- purrr::map(dep_apl_df_list[[2]],~collate_base_models(candidate_variables_list,  model_df_rel, .x ,
                                                                        pos_sign_variables , neg_sign_variables ,
                                                                        base_variables, with_intercept,
                                                                        var_agg_delimiter , run_up_to_flexi_vars,
                                                                        vif_threshold, pvalue_thresholds,
-                                                                       drop_pvalue_precision, discard_estimate_sign, drop_highest_estimate,
+                                                                       drop_pvalue_precision, drop_discard_estimate_sign, drop_highest_estimate,
                                                                        get_model_object ))
 
   model_coef_all <- purrr::map_dfr(model_result, 1, .id = "dependent_id") %>%
