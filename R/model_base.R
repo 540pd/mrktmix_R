@@ -119,7 +119,7 @@ determine_pvalue_flag <- function(type, pvalue, pvalue_thresholds) {
 determine_expected_sign <- function(variable, pos_vars, neg_vars, var_agg_delimiter) {
   expected_pos <- lapply(stringr::str_split(variable, stringr::fixed(var_agg_delimiter)), `%in%`, pos_vars)
   expected_neg <- lapply(stringr::str_split(variable, stringr::fixed(var_agg_delimiter)), `%in%`, neg_vars)
-
+  
   dplyr::if_else(
     unlist(lapply(expected_pos, all)), TRUE,
     dplyr::if_else(
@@ -228,7 +228,7 @@ identify_drop_variable <- function(coef_df, pvalue_precision, discard_sign, high
     dplyr::filter(.data[["to_drop"]]) %>%
     dplyr::slice(1) %>%
     dplyr::pull(.data[["variable"]])
-
+  
   drop_var
 }
 
@@ -304,32 +304,32 @@ update_model <- function(model, model_data, variable_to_drop) {
 #'
 cleanse_model_singularity <- function(lm_model, model_data, flexible_variables, round_digits = 2, verbose = FALSE) {
   model_vars <- names(stats::coef(lm_model))
-
+  
   # Filter flexible variables present in the model
   flexible_variables <- flexible_variables[flexible_variables %in% model_vars]
-
+  
   repeat {
     aliased_info <- summary(lm_model)$aliased
     singular_vars <- names(aliased_info)[aliased_info]
     singular_vars <- intersect(singular_vars, flexible_variables)
-
+    
     # Break if no singular variables
     if (length(singular_vars) == 0) break
-
+    
     # Calculate linear dependency
     linear_dependency <- apply(stats::alias(lm_model)[[2]], 1, function(x) sum(abs(x[round(abs(x), 1) == 1])))
     singular_vars_dependency <- linear_dependency[names(linear_dependency) %in% singular_vars]
     drop_var <- names(sort(singular_vars_dependency, decreasing = TRUE))[1]
-
+    
     # Verbose output
     if (verbose) {
       message("Dropping variable due to singularity: ", drop_var)
     }
-
+    
     # Update model by removing the most dependent variable
     lm_model <- stats::update(lm_model, formula = stats::as.formula(paste(". ~ . -", drop_var)), data = model_data)
   }
-
+  
   lm_model
 }
 
@@ -373,29 +373,29 @@ cleanse_model_perfect_fit <- function(lm_model, model_data, flexible_variables,
                                       drop_highest_estimate = TRUE,
                                       ignore_estimate_sign = TRUE) {
   model_summary <- summary(lm_model)
-
+  
   # Check for no residual degree of freedom
   if (model_summary$df[2] != 0) {
     return(lm_model)
   }
-
+  
   # Extract and optionally modify estimates for flexible variables
   model_estimate <- stats::coef(lm_model)[flexible_variables]
   if (ignore_estimate_sign) {
     model_estimate <- abs(model_estimate)
   }
-
+  
   # Determine variable to drop based on estimates
   drop_var <- if (drop_highest_estimate) {
     names(which.min(model_estimate))
   } else {
     names(which.max(model_estimate))
   }
-
+  
   # Update the model formula by removing the identified variable
   lm_model <- stats::update(lm_model,
                             formula = stats::as.formula(paste(". ~ . -", drop_var)), data = model_data)
-
+  
   lm_model
 }
 
@@ -431,11 +431,11 @@ calculate_vif <- function(model) {
   if (!inherits(model, c("lm", "glm"))) {
     stop("Input must be a linear model object of class 'lm' or 'glm'.")
   }
-
+  
   # Check if the model includes an intercept
   coef_model <- stats::coef(model)
   has_intercept <- !is.na(coef_model["(Intercept)"])
-
+  
   # Calculate VIF, handling potential errors
   vif_values <- tryCatch({
     # Suppress warnings to handle multicollinearity gracefully
@@ -445,7 +445,7 @@ calculate_vif <- function(model) {
     warning("An error occurred in calculating VIF. Returning Inf for all coefficients. Error: ", e$message)
     rep(Inf, length(coef_model) - if (has_intercept) 1 else 0)
   })
-
+  
   # Add intercept with NA if model has an intercept, otherwise use VIF values directly
   if (has_intercept) {
     vif_result <- c(NA, vif_values)
@@ -453,7 +453,7 @@ calculate_vif <- function(model) {
     vif_result <- vif_values
   }
   names(vif_result) <- names(coef_model)
-
+  
   return(vif_result)
 }
 
@@ -528,12 +528,12 @@ get_base_model <- function(lm_model, model_data, independent_var_info, pos_vars,
     drop_highest_estimate = FALSE,
     ignore_estimate_sign = TRUE
   )
-
+  
   # Initialize loop and data frames to store results
   loop_id <- 1
   model_coef_all <- tibble::tibble()
   model_smry_all <- tibble::tibble()
-
+  
   # Begin variable dropping loop
   repeat {
     # Get summary of the current model
@@ -555,11 +555,11 @@ get_base_model <- function(lm_model, model_data, independent_var_info, pos_vars,
         flag_vif = determine_vif_flag(.data$type, .data$vif, vif_threshold)
       ) %>%
       dplyr::select(-"expected_sign")
-
+    
     # Accumulate results
     model_coef_all <- dplyr::bind_rows(model_coef_all, model_coef)
     model_smry_all <- dplyr::bind_rows(model_smry_all, summarize_model(lm_model_smry, loop_id))
-
+    
     # Identify variable to drop based on the current model
     variable_to_drop <- identify_drop_variable(
       model_coef,
@@ -568,23 +568,23 @@ get_base_model <- function(lm_model, model_data, independent_var_info, pos_vars,
       drop_highest_estimate,
       run_up_to_flexi_vars
     )
-
+    
     # Break loop if no variable is identified to drop
     if (is.na(variable_to_drop) || !length(variable_to_drop)) {
       break
     }
-
+    
     # Update loop counter and model
     loop_id <- loop_id + 1
     lm_model <- update_model(lm_model, model_data, variable_to_drop)
   }
-
+  
   # Return results
   if (get_model_object) {
     coef_smry_lm <- list(model_coef_all, model_smry_all, lm_model)
   } else {
     coef_smry_lm <- list(model_coef_all, model_smry_all, NA)
   }
-
+  
   return(coef_smry_lm)
 }
