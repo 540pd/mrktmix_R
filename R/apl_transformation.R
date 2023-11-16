@@ -86,9 +86,9 @@ generate_apl_dataframe <- function(modeling_df, adstock, power, lag, apl_delimit
       })
     })
   })
-
+  
   transformed_df_list <- unlist(unlist(transformed_df_list, recursive = FALSE), recursive = FALSE)
-
+  
   transformed_df_list <- lapply(transformed_df_list, function(transformed_df) {
     names(transformed_df[[1]]) <- paste(names(transformed_df[[1]]), names(transformed_df), sep = delimiter)
     return(transformed_df)
@@ -196,15 +196,15 @@ generate_apl_combinations <- function(adstock_start_end_step, power_start_end_st
     c(adstock_start_end_step, power_start_end_step, lag_start_end_step),
     function(x) seq(x["start"], x["end"], x["step"])
   )
-
+  
   # Generate all combinations
   combination <- expand.grid(adstock = apl$adstock, power = apl$power, lag = apl$lag)
-
+  
   # Apply additional constraints if specified
   if (!is.na(apl_constraints)) {
     combination <- subset(combination, eval(parse(text = apl_constraints$constraints)))
   }
-
+  
   # Return the combinations as a list
   return(unname(asplit(combination, 1)))
 }
@@ -264,10 +264,11 @@ generate_variable_combination <- function(variables_wt_apl_constraints) {
       x["constraints"]
     )
   )
-
+  
   if (length(variables_apl_combination) == 1) {
     variables_apl_combination <- list(variables_apl_combination)
   }
-
+  
   return(apply(do.call(expand.grid, variables_apl_combination), 1, as.list))
 }
+
