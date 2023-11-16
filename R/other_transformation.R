@@ -163,7 +163,7 @@ aggregate_columns <- function(modeling_df, aggregated_variables, delimiter = "|"
 #' @importFrom magrittr "%>%"
 #' @importFrom stats setNames
 #' @importFrom stringr str_replace str_split
-#' @importFrom tidyselect everything
+#' @importFrom tidyselect everything any_of
 #' @export
 #'
 decompose_model_component <- function(variables_wt_weights, model_df,
@@ -175,7 +175,7 @@ decompose_model_component <- function(variables_wt_weights, model_df,
 
   # Select and weight the variables in the model dataframe. If variable is already present in data, apl won't be applied.
   model_df_selected <- model_df %>%
-    dplyr::mutate(dplyr::across(any_of(names(variables_wt_weights)),
+    dplyr::mutate(dplyr::across(tidyselect::any_of(names(variables_wt_weights)),
                                 ~ .x * variables_wt_weights[dplyr::cur_column()]),
                   .keep = "used")
   # Remaining variables after selection
