@@ -163,7 +163,7 @@ aggregate_columns <- function(modeling_df, aggregated_variables, delimiter = "|"
 #' @importFrom magrittr "%>%"
 #' @importFrom stats setNames
 #' @importFrom stringr str_replace str_split
-#' @importFrom tidyselect everything any_of
+#' @importFrom tidyselect everything
 #' @export
 #'
 decompose_model_component <- function(variables_wt_weights, model_df,
@@ -173,11 +173,9 @@ decompose_model_component <- function(variables_wt_weights, model_df,
                                       var_agg_delimiter="|") {
   # Treat weights as coefficients if is_weight_coefficient is TRUE, otherwise as contributions
 
-  # Select and weight the variables in the model dataframe. If variable is already present in data, apl won't be applied.
   model_df_selected <- model_df %>%
-    dplyr::mutate(dplyr::across(tidyselect::any_of(names(variables_wt_weights)),
-                                ~ .x * variables_wt_weights[dplyr::cur_column()]),
-                  .keep = "used")
+    dplyr::select(any_of(names(variables_wt_weights)))
+
   # Remaining variables after selection
   variables_wt_weights_left <- variables_wt_weights[!names(variables_wt_weights) %in% names(model_df_selected)]
 
@@ -185,7 +183,8 @@ decompose_model_component <- function(variables_wt_weights, model_df,
   intercept_key <- c("Intercept","intercept","(Intercept)")
   intercept_exists <- names(variables_wt_weights_left) %in% intercept_key
   if (any(intercept_exists)) {
-    model_df_selected[,names(variables_wt_weights_left[intercept_exists])] <- variables_wt_weights_left[intercept_exists]
+    # model_df_selected[,names(variables_wt_weights_left[intercept_exists])] <- variables_wt_weights_left[intercept_exists]
+    model_df_selected[,names(variables_wt_weights_left[intercept_exists])] <- 1
     variables_wt_weights_left <- variables_wt_weights_left[!intercept_exists]
   }
 
@@ -219,14 +218,20 @@ decompose_model_component <- function(variables_wt_weights, model_df,
       dplyr::select(tidyr::all_of(names(variables_wt_weights)))
   }
 
+  model_df_combined_est <- model_df_combined %>%
+    dplyr::mutate(dplyr::across(any_of(names(variables_wt_weights)),
+                                ~ .x * variables_wt_weights[dplyr::cur_column()]),
+                  .keep = "used")
+
+
   # Adjust for weight coefficients if not treating as coefficients
   if (!is_weight_coefficient) {
-    model_df_combined <- model_df_combined %>%
+    model_df_combined_est <- model_df_combined_est %>%
       dplyr::mutate(dplyr::across(everything(), ~ .x / sum(.x, na.rm = TRUE) * {{variables_wt_weights}}[dplyr::cur_column()]))
   }
 
   # Return the final model dataframe with applied transformations
-  return(model_df_combined)
+  return(model_df_combined_est)
 }
 
 #' Generate Model-Dependent Data Frames with APL Transformations
