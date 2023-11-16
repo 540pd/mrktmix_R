@@ -169,7 +169,8 @@ aggregate_columns <- function(modeling_df, aggregated_variables, delimiter = "|"
 decompose_model_component <- function(variables_wt_weights, model_df,
                                       is_weight_coefficient = TRUE,
                                       apl_delimiter = "_",
-                                      delimiter = "|") {
+                                      delimiter = "|",
+                                      var_agg_delimiter="|") {
   # Treat weights as coefficients if is_weight_coefficient is TRUE, otherwise as contributions
 
   # Select and weight the variables in the model dataframe. If variable is already present in data, apl won't be applied.
@@ -184,7 +185,7 @@ decompose_model_component <- function(variables_wt_weights, model_df,
   intercept_key <- c("Intercept","intercept","(Intercept)")
   intercept_exists <- names(variables_wt_weights_left) %in% intercept_key
   if (any(intercept_exists)) {
-    model_df_selected[names(variables_wt_weights_left[intercept_exists])] <- variables_wt_weights_left[intercept_exists]
+    model_df_selected[,names(variables_wt_weights_left[intercept_exists])] <- variables_wt_weights_left[intercept_exists]
     variables_wt_weights_left <- variables_wt_weights_left[!intercept_exists]
   }
 
@@ -202,8 +203,14 @@ decompose_model_component <- function(variables_wt_weights, model_df,
     }) %>%
       setNames(variable_info$variable)
 
+    # Dependent Data - create aggregation if required
+    vars_in_model_df_logical<-names(apl_info) %in%  names(model_df)
+    vars_expected_model_df<-names(apl_info)[!vars_in_model_df_logical]
+    model_df_rel<-aggregate_columns(model_df, c(vars_expected_model_df, names(apl_info)[vars_in_model_df_logical]) ,  var_agg_delimiter)
+
+
     # Apply APL transformations and recombine with the selected data
-    model_df_transformed <- apply_apl(model_df, apl_info)
+    model_df_transformed <- apply_apl(model_df_rel, apl_info)
     model_df_combined <- model_df_selected %>%
       dplyr::bind_cols(model_df_transformed) %>%
       dplyr::select(tidyr::all_of(names(variables_wt_weights)))
@@ -279,20 +286,21 @@ generate_model_dependent <- function(var_info, model_df,
   
   if (is.vector(var_info) && is.numeric(var_info) && all(!is.na(names(var_info)))) {
 
-    # Dependent Data - create aggregation if required
-    vars_in_model_df_logical<-names(var_info) %in%  names(model_df)
-    vars_expected_model_df<-names(var_info)[!vars_in_model_df_logical] %>%
-      parse_variable_wt_apl(apl_delimiter, var_apl_delimiter) %>%
-      dplyr::pull("variable") %>%
-      c(names(var_info)[vars_in_model_df_logical])
-    model_df_rel<-aggregate_columns(model_df, vars_expected_model_df,  var_agg_delimiter)
+    # # Dependent Data - create aggregation if required
+    # vars_in_model_df_logical<-names(var_info) %in%  names(model_df)
+    # vars_expected_model_df<-names(var_info)[!vars_in_model_df_logical] %>%
+    #   parse_variable_wt_apl(apl_delimiter, var_apl_delimiter) %>%
+    #   dplyr::pull("variable") %>%
+    #   c(names(var_info)[vars_in_model_df_logical])
+    # model_df_rel<-aggregate_columns(model_df, vars_expected_model_df,  var_agg_delimiter)
 
     # Process named vector
     apl_df_list <- list(
-      decompose_model_component(var_info, model_df_rel,
+      decompose_model_component(var_info, model_df,
                                 is_weight_coefficient = FALSE,
                                 apl_delimiter = apl_delimiter,
-                                delimiter = var_apl_delimiter
+                                delimiter = var_apl_delimiter,
+                                var_agg_delimiter = var_agg_delimiter
       ) %>%
         dplyr::mutate(dplyr::across(everything(), ~tidyr::replace_na(.x, 0)))
     )
