@@ -34,7 +34,7 @@ compose_variable_apl <- function(variables_wt_named_apl, apl_delimiter = "_", de
     # Concatenate each value with the variable name using the provided delimiters
     paste(name, paste(unlist(values), collapse = apl_delimiter), sep = delimiter)
   }, names(variables_wt_named_apl), variables_wt_named_apl, SIMPLIFY = FALSE)
-  
+
   # Combine the result into a single character vector without names
   unname(unlist(result))
 }
@@ -70,15 +70,15 @@ compose_variable_apl <- function(variables_wt_named_apl, apl_delimiter = "_", de
 #' @importFrom stats na.omit
 #'
 parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimiter = "|") {
-  
+
   # Escape the special characters in regular expression
   escaped_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", delimiter)
   escaped_apl_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", apl_delimiter)
-  
+
   regex_pattern <- paste0("(.+?)", escaped_delimiter, "([0-9.]+", escaped_apl_delimiter, "?[0-9.]*", escaped_apl_delimiter, "?[0-9.]*)$")
-  
+
   matches <- stringr::str_match(variables_wt_apl, regex_pattern)
-  
+
   if(any(!stats::complete.cases(matches))){
     matches[!stats::complete.cases(matches),]<-c(variables_wt_apl[!stats::complete.cases(matches)], variables_wt_apl[!stats::complete.cases(matches)], paste(0,1,0,sep=apl_delimiter))
   }
@@ -86,7 +86,7 @@ parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimit
     warning("Some inputs did not match the expected format and will be omitted.")
     matches <- na.omit(matches)
   }
-  
+
   data.frame(
     variable = matches[, 2],
     adstock = as.numeric(stringr::str_extract(matches[, 3], "^[0-9.]+")),
@@ -138,6 +138,7 @@ aggregate_columns <- function(modeling_df, aggregated_variables, delimiter = "|"
 #'   coefficients. If FALSE, they are treated as contributions.
 #' @param apl_delimiter Delimiter used in variable names to separate APL components.
 #' @param delimiter Delimiter used in variable names to denote different variables.
+#' @param var_agg_delimiter Delimiter used for aggregating variables (default "|").
 #'
 #' @return A transformed data frame with variables weighted and APL transformations
 #'   applied.
@@ -155,7 +156,8 @@ aggregate_columns <- function(modeling_df, aggregated_variables, delimiter = "|"
 #'   transformed_df <- decompose_model_component(variables_wt_weights, model_df,
 #'                                               is_weight_coefficient = FALSE,
 #'                                               apl_delimiter = "_",
-#'                                               delimiter = "|")
+#'                                               delimiter = "|",
+#'                                               var_agg_delimiter="|")
 #' }
 #'
 #' @importFrom dplyr mutate across any_of bind_cols select if_else cur_column
@@ -172,13 +174,13 @@ decompose_model_component <- function(variables_wt_weights, model_df,
                                       delimiter = "|",
                                       var_agg_delimiter="|") {
   # Treat weights as coefficients if is_weight_coefficient is TRUE, otherwise as contributions
-  
+
   model_df_selected <- model_df %>%
     dplyr::select(any_of(names(variables_wt_weights)))
-  
+
   # Remaining variables after selection
   variables_wt_weights_left <- variables_wt_weights[!names(variables_wt_weights) %in% names(model_df_selected)]
-  
+
   # Check for the presence of an intercept term and include it if present
   intercept_key <- c("Intercept","intercept","(Intercept)")
   intercept_exists <- names(variables_wt_weights_left) %in% intercept_key
@@ -187,7 +189,7 @@ decompose_model_component <- function(variables_wt_weights, model_df,
     model_df_selected[,names(variables_wt_weights_left[intercept_exists])] <- 1
     variables_wt_weights_left <- variables_wt_weights_left[!intercept_exists]
   }
-  
+
   if(length(variables_wt_weights_left)){
     # Parse variables for APL information
     variable_info <- parse_variable_wt_apl(names(variables_wt_weights_left), apl_delimiter, delimiter)
@@ -195,19 +197,19 @@ decompose_model_component <- function(variables_wt_weights, model_df,
     variables_wt_weights_captured <- variables_wt_weights[!names(variables_wt_weights) %in% names(variables_wt_weights_left)]
     variables_wt_weights_apl <- setNames(variables_wt_weights_left, variable_info$variable)
     names(variables_wt_weights)[names(variables_wt_weights) %in% names(variables_wt_weights_left)]<-names(variables_wt_weights_apl)
-    
+
     # Create APL information list using pmap
     apl_info <- purrr::pmap(variable_info, function(variable, adstock, power, lag) {
       setNames(c(adstock, power, lag), names(variable_info)[-1])
     }) %>%
       setNames(variable_info$variable)
-    
+
     # Dependent Data - create aggregation if required
     vars_in_model_df_logical<-names(apl_info) %in%  names(model_df)
     vars_expected_model_df<-names(apl_info)[!vars_in_model_df_logical]
     model_df_rel<-aggregate_columns(model_df, c(vars_expected_model_df, names(apl_info)[vars_in_model_df_logical]) ,  var_agg_delimiter)
-    
-    
+
+
     # Apply APL transformations and recombine with the selected data
     model_df_transformed <- apply_apl(model_df_rel, apl_info)
     model_df_combined <- model_df_selected %>%
@@ -217,19 +219,19 @@ decompose_model_component <- function(variables_wt_weights, model_df,
     model_df_combined <- model_df_selected %>%
       dplyr::select(tidyr::all_of(names(variables_wt_weights)))
   }
-  
+
   model_df_combined_est <- model_df_combined %>%
     dplyr::mutate(dplyr::across(any_of(names(variables_wt_weights)),
                                 ~ .x * variables_wt_weights[dplyr::cur_column()]),
                   .keep = "used")
-  
-  
+
+
   # Adjust for weight coefficients if not treating as coefficients
   if (!is_weight_coefficient) {
     model_df_combined_est <- model_df_combined_est %>%
       dplyr::mutate(dplyr::across(everything(), ~ .x / sum(.x, na.rm = TRUE) * {{variables_wt_weights}}[dplyr::cur_column()]))
   }
-  
+
   # Return the final model dataframe with applied transformations
   return(model_df_combined_est)
 }
@@ -288,9 +290,9 @@ generate_model_dependent <- function(var_info, model_df,
   if(is.vector(var_info) && is.character(var_info)){
     var_info <- setNames(sapply(model_df[,var_info, drop=FALSE],sum, na.rm=T),paste(var_info, var_apl_delimiter,0,apl_delimiter,1,apl_delimiter,0, sep =""))
   }
-  
+
   if (is.vector(var_info) && is.numeric(var_info) && all(!is.na(names(var_info)))) {
-    
+
     # # Dependent Data - create aggregation if required
     # vars_in_model_df_logical<-names(var_info) %in%  names(model_df)
     # vars_expected_model_df<-names(var_info)[!vars_in_model_df_logical] %>%
@@ -298,7 +300,7 @@ generate_model_dependent <- function(var_info, model_df,
     #   dplyr::pull("variable") %>%
     #   c(names(var_info)[vars_in_model_df_logical])
     # model_df_rel<-aggregate_columns(model_df, vars_expected_model_df,  var_agg_delimiter)
-    
+
     # Process named vector
     apl_df_list <- list(
       decompose_model_component(var_info, model_df,
@@ -310,11 +312,11 @@ generate_model_dependent <- function(var_info, model_df,
         dplyr::mutate(dplyr::across(everything(), ~tidyr::replace_na(.x, 0)))
     )
     var_apl_info <- parse_variable_wt_apl(names(var_info), apl_delimiter, var_apl_delimiter)
-    
+
   } else {
     # Dependent Data - create aggregation if required
     model_df_rel<-aggregate_columns(model_df, names(var_info), var_agg_delimiter)
-    
+
     # Process list
     var_wt_apl <- generate_variable_combination(var_info)
     apl_df_list <- purrr::map(var_wt_apl, ~apply_apl(model_df_rel, .x) %>%
@@ -325,7 +327,7 @@ generate_model_dependent <- function(var_info, model_df,
       tidyr::unnest_wider("named_vector") %>%
       tibble::as_tibble()
   }
-  
+
   list(var_apl_info, apl_df_list)
 }
 
@@ -377,15 +379,15 @@ get_dep_indep_vars <- function(model_variable, var_agg_delimiter = "|", trim = T
   } else if (stringr::str_detect(model_variable, "\\+")) {
     "Aggregate"
   }
-  
+
   # Print the determined model type if requested
   if (print_model_type) {
     cat("Model Type:", model_type, "\n")
   }
-  
+
   # Initialize variables for dependent and independent variables
   dep_var_rel <- indep_vars <- character()
-  
+
   # Based on the model type, process the model variable
   if (model_type == "Remodel") {
     dep_var_rel <- model_variable
@@ -400,12 +402,140 @@ get_dep_indep_vars <- function(model_variable, var_agg_delimiter = "|", trim = T
     dep_var_rel <- stringr::str_replace_all(model_variable, "-", var_agg_delimiter)
     indep_vars <- unlist(stringr::str_split(model_variable, "-"))
   }
-  
+
   if(trim){
     dep_var_rel<-unlist(lapply(stringr::str_split(dep_var_rel,stringr::fixed(var_agg_delimiter)), function(x) paste0(stringr::str_trim(x, side = c("both")),collapse = var_agg_delimiter)))
     indep_vars<-unlist(lapply(stringr::str_split(indep_vars,stringr::fixed(var_agg_delimiter)), function(x) paste0(stringr::str_trim(x, side = c("both")),collapse = var_agg_delimiter)))
   }
-  
+
   # Return a list containing the processed dependent and independent variables
   return(list(dependent_var = dep_var_rel, independent_var = indep_vars))
+}
+
+#' Determine the Expected Sign of Model Coefficients
+#'
+#' This function assesses whether the coefficients of given variables are
+#' expected to be positive or negative. It is particularly useful for variables
+#' that may have aggregated names, determining the expected sign based on the
+#' segregation of each part of the variable name.
+#'
+#' @param variable A character string representing the name of the variable
+#'                 whose coefficient sign is to be determined. For aggregated
+#'                 variable names, the function segregates the parts based on
+#'                 the provided delimiter.
+#' @param pos_vars A character vector of variable names that are expected to
+#'                 have a positive impact. Coefficients of these variables
+#'                 are expected to be positive.
+#' @param neg_vars A character vector of variable names that are expected to
+#'                 have a negative impact. Coefficients of these variables
+#'                 are expected to be negative.
+#' @param var_agg_delimiter A character string delimiter used in the variable
+#'                          names for aggregation purposes. This delimiter
+#'                          is used to split the variable names if they are
+#'                          aggregated.
+#'
+#' @return A logical value; returns TRUE if all segregated parts of the variable
+#'         are expected to have a positive sign, FALSE if all are expected to
+#'         have a negative sign. If the segregated parts of the variable do not
+#'         uniformly align with either positive or negative expectations, the
+#'         function returns NA.
+#'
+#' @details
+#' In the case of an aggregated variable (a variable name composed of multiple
+#' parts separated by the delimiter), the function determines the expected sign
+#' based on the segregation of each part. The output will be TRUE only if all
+#' segregated parts have an expected positive sign; similarly, it will be FALSE
+#' only if all parts have an expected negative sign. If there is any inconsistency
+#' among the segregated parts, the expected sign will be NA.
+#'
+#' @examples
+#' \dontrun{
+#'   pos_vars <- c("sales", "marketing")
+#'   neg_vars <- c("costs", "returns")
+#'   determine_expected_sign("sales|Q1", pos_vars, neg_vars, "|") # Returns TRUE
+#'   determine_expected_sign("costs|Q1", pos_vars, neg_vars, "|") # Returns FALSE
+#'   determine_expected_sign("sales|other", pos_vars, neg_vars, "|") # Returns NA
+#' }
+#'
+determine_expected_sign <- function(variable, pos_vars, neg_vars, var_agg_delimiter) {
+  expected_pos <- lapply(stringr::str_split(variable, stringr::fixed(var_agg_delimiter)), `%in%`, pos_vars)
+  expected_neg <- lapply(stringr::str_split(variable, stringr::fixed(var_agg_delimiter)), `%in%`, neg_vars)
+
+  dplyr::if_else(
+    unlist(lapply(expected_pos, all)), TRUE,
+    dplyr::if_else(
+      unlist(lapply(expected_pos, any)), NA,
+      dplyr::if_else(unlist(lapply(expected_neg, all)), FALSE, NA)
+    )
+  )
+}
+
+#' Flag P-Values Based on Predefined Thresholds
+#'
+#' This function evaluates p-values of predictors and flags them based on
+#' predefined thresholds specific to their types (intercept, fixed, or flexible).
+#'
+#' @param type A character string indicating the type of the predictor.
+#'             Valid options are 'intercept', 'fixed', or 'flexible'.
+#' @param pvalue A numeric value representing the p-value of the predictor.
+#' @param pvalue_thresholds A named numeric vector of thresholds for each
+#'                          predictor type. The names of the vector should
+#'                          be 'intercept', 'fixed', and 'flexible'.
+#'
+#' @return A logical value; TRUE if the p-value is above the threshold for its
+#'         respective type. This function helps in identifying statistically
+#'         significant predictors based on their p-values and predefined criteria.
+#'
+#' @examples
+#' \dontrun{
+#'   pvalue_thresholds <- c(intercept = 0.05, fixed = 0.05, flexible = 0.1)
+#'   determine_pvalue_flag("fixed", 0.04, pvalue_thresholds)     # Returns FALSE
+#'   determine_pvalue_flag("flexible", 0.08, pvalue_thresholds)  # Returns TRUE
+#'   determine_pvalue_flag("intercept", 0.06, pvalue_thresholds) # Returns TRUE
+#' }
+#'
+determine_pvalue_flag <- function(type, pvalue, pvalue_thresholds) {
+  dplyr::if_else(
+    type == "intercept", pvalue > pvalue_thresholds["intercept"],
+    dplyr::if_else(
+      type == "fixed", pvalue > pvalue_thresholds["fixed"],
+      pvalue > pvalue_thresholds["flexible"]
+    )
+  )
+}
+
+#' Determine VIF Flag for Predictors
+#'
+#' This function evaluates the Variance Inflation Factor (VIF) for predictors and
+#' determines if it exceeds a specified threshold. It accounts for special cases
+#' based on the type of the variable.
+#'
+#' @param type Character string indicating the type of the variable.
+#'             Options are 'fixed' or 'flexible'. The function applies special
+#'             logic if there is only one 'fixed' variable.
+#' @param vif_threshold Numeric value specifying the threshold above which the
+#'                      VIF flag should be triggered.
+#'
+#' @return A numeric value; the function returns \code{Inf} (infinite) if there is only
+#'         one 'fixed' variable, otherwise it returns the `vif_threshold`.
+#'
+#' @details
+#' The function uses the following logic:
+#' - If the `type` is 'fixed' and there is only one such variable, it returns \code{Inf}.
+#'   This accounts for the scenario where a single fixed variable should not trigger
+#'   a flag by having an artificially high VIF.
+#' - In all other cases, it returns the `vif_threshold`.
+#'
+#' @importFrom stringr str_count
+#' @importFrom dplyr if_else
+#'
+#' @examples
+#' \dontrun{
+#'   find_critical_vif("fixed", 5)      # Returns Inf
+#'   find_critical_vif("flexible", 5)   # Returns 5
+#'   find_critical_vif("fixed|fixed", 5)  # Returns 5
+#' }
+#'
+find_critical_vif <- function(type, vif_threshold) {
+  dplyr::if_else(sum(stringr::str_count(type, "fixed")) == 1, Inf, vif_threshold)
 }
