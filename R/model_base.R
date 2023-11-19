@@ -1,134 +1,3 @@
-#' Determine VIF Flag for Predictors
-#'
-#' This function evaluates the Variance Inflation Factor (VIF) for predictors and
-#' determines if it exceeds a specified threshold. It accounts for special cases
-#' based on the type of the variable.
-#'
-#' @param type Character string indicating the type of the variable.
-#'             Options are 'fixed' or 'flexible'. The function applies special
-#'             logic if there is only one 'fixed' variable.
-#' @param vif Numeric VIF value for the predictor. This value is used to assess
-#'            whether the VIF exceeds the threshold.
-#' @param vif_threshold Numeric value specifying the threshold above which the
-#'                      VIF flag should be triggered.
-#'
-#' @return A logical value; TRUE if the VIF is greater than the threshold,
-#'         except when there is only one 'fixed' variable and the VIF is
-#'         infinite, in which case it returns FALSE.
-#'
-#' @details
-#' The function uses the following logic:
-#' - If the `type` is 'fixed' and there is only one such variable with an
-#'   infinite VIF, it returns FALSE. This accounts for the scenario where a
-#'   single fixed variable should not trigger a flag.
-#' - In all other cases, it checks if the `vif` exceeds the `vif_threshold`.
-#'   If so, it returns TRUE, indicating that the VIF flag should be triggered.
-#'
-#' @importFrom stringr str_count
-#'
-#' @examples
-#' \dontrun{
-#'   determine_vif_flag("fixed", Inf, 5)    # Returns FALSE
-#'   determine_vif_flag("flexible", 10, 5)  # Returns TRUE
-#'   determine_vif_flag("fixed", 4, 5)      # Returns FALSE
-#' }
-#'
-determine_vif_flag <- function(type, vif, vif_threshold) {
-  dplyr::if_else(sum(str_count(type, "fixed")) == 1 & is.infinite(vif), FALSE, vif > vif_threshold)
-}
-
-#' Flag P-Values Based on Predefined Thresholds
-#'
-#' This function evaluates p-values of predictors and flags them based on
-#' predefined thresholds specific to their types (intercept, fixed, or flexible).
-#'
-#' @param type A character string indicating the type of the predictor.
-#'             Valid options are 'intercept', 'fixed', or 'flexible'.
-#' @param pvalue A numeric value representing the p-value of the predictor.
-#' @param pvalue_thresholds A named numeric vector of thresholds for each
-#'                          predictor type. The names of the vector should
-#'                          be 'intercept', 'fixed', and 'flexible'.
-#'
-#' @return A logical value; TRUE if the p-value is above the threshold for its
-#'         respective type. This function helps in identifying statistically
-#'         significant predictors based on their p-values and predefined criteria.
-#'
-#' @examples
-#' \dontrun{
-#'   pvalue_thresholds <- c(intercept = 0.05, fixed = 0.05, flexible = 0.1)
-#'   determine_pvalue_flag("fixed", 0.04, pvalue_thresholds)     # Returns FALSE
-#'   determine_pvalue_flag("flexible", 0.08, pvalue_thresholds)  # Returns TRUE
-#'   determine_pvalue_flag("intercept", 0.06, pvalue_thresholds) # Returns TRUE
-#' }
-#'
-determine_pvalue_flag <- function(type, pvalue, pvalue_thresholds) {
-  dplyr::if_else(
-    type == "intercept", pvalue > pvalue_thresholds["intercept"],
-    dplyr::if_else(
-      type == "fixed", pvalue > pvalue_thresholds["fixed"],
-      pvalue > pvalue_thresholds["flexible"]
-    )
-  )
-}
-
-#' Determine the Expected Sign of Model Coefficients
-#'
-#' This function assesses whether the coefficients of given variables are
-#' expected to be positive or negative. It is particularly useful for variables
-#' that may have aggregated names, determining the expected sign based on the
-#' segregation of each part of the variable name.
-#'
-#' @param variable A character string representing the name of the variable
-#'                 whose coefficient sign is to be determined. For aggregated
-#'                 variable names, the function segregates the parts based on
-#'                 the provided delimiter.
-#' @param pos_vars A character vector of variable names that are expected to
-#'                 have a positive impact. Coefficients of these variables
-#'                 are expected to be positive.
-#' @param neg_vars A character vector of variable names that are expected to
-#'                 have a negative impact. Coefficients of these variables
-#'                 are expected to be negative.
-#' @param var_agg_delimiter A character string delimiter used in the variable
-#'                          names for aggregation purposes. This delimiter
-#'                          is used to split the variable names if they are
-#'                          aggregated.
-#'
-#' @return A logical value; returns TRUE if all segregated parts of the variable
-#'         are expected to have a positive sign, FALSE if all are expected to
-#'         have a negative sign. If the segregated parts of the variable do not
-#'         uniformly align with either positive or negative expectations, the
-#'         function returns NA.
-#'
-#' @details
-#' In the case of an aggregated variable (a variable name composed of multiple
-#' parts separated by the delimiter), the function determines the expected sign
-#' based on the segregation of each part. The output will be TRUE only if all
-#' segregated parts have an expected positive sign; similarly, it will be FALSE
-#' only if all parts have an expected negative sign. If there is any inconsistency
-#' among the segregated parts, the expected sign will be NA.
-#'
-#' @examples
-#' \dontrun{
-#'   pos_vars <- c("sales", "marketing")
-#'   neg_vars <- c("costs", "returns")
-#'   determine_expected_sign("sales|Q1", pos_vars, neg_vars, "|") # Returns TRUE
-#'   determine_expected_sign("costs|Q1", pos_vars, neg_vars, "|") # Returns FALSE
-#'   determine_expected_sign("sales|other", pos_vars, neg_vars, "|") # Returns NA
-#' }
-#'
-determine_expected_sign <- function(variable, pos_vars, neg_vars, var_agg_delimiter) {
-  expected_pos <- lapply(stringr::str_split(variable, stringr::fixed(var_agg_delimiter)), `%in%`, pos_vars)
-  expected_neg <- lapply(stringr::str_split(variable, stringr::fixed(var_agg_delimiter)), `%in%`, neg_vars)
-  
-  dplyr::if_else(
-    unlist(lapply(expected_pos, all)), TRUE,
-    dplyr::if_else(
-      unlist(lapply(expected_pos, any)), NA,
-      dplyr::if_else(unlist(lapply(expected_neg, all)), FALSE, NA)
-    )
-  )
-}
-
 #' Summarize Key Statistics from a Linear Model
 #'
 #' This function extracts and summarizes important statistics from a linear
@@ -216,19 +85,25 @@ summarize_model <- function(model_summary, loop_id) {
 #' }
 #'
 identify_drop_variable <- function(coef_df, pvalue_precision, discard_sign, highest_estimate, run_up_to_flexi_vars) {
-  # Using .data pronoun for non-standard evaluation inside dplyr verbs
-  drop_var <- coef_df %>%
-    dplyr::filter(.data[["type"]] %in% c("flexible", "intercept")) %>%
-    dplyr::mutate(
-      `Pr(>|t|)` = round(dplyr::if_else(.data[["type"]]=="intercept",.data[["Pr(>|t|)"]]-1,.data[["Pr(>|t|)"]]), pvalue_precision),
-      Estimate = if(discard_sign) abs(.data[["Estimate"]]) else .data[["Estimate"]],
-      flag_flag = rowSums(dplyr::across(c("flag_pvalue", "flag_sign", "flag_vif")), na.rm = T) != 0) %>%
-    dplyr::arrange(dplyr::desc(.data[["flag_flag"]]),dplyr::desc(.data[["Pr(>|t|)"]]),if(highest_estimate) dplyr::desc(.data[["Estimate"]]) else .data[["Estimate"]]) %>%
-    dplyr::mutate(to_drop = .data[["flag_flag"]] | (dplyr::n() > run_up_to_flexi_vars)) %>%
-    dplyr::filter(.data[["to_drop"]]) %>%
-    dplyr::slice(1) %>%
-    dplyr::pull(.data[["variable"]])
-  
+  coef_df<-coef_df[coef_df$type != "fixed",c("type","variable","Pr(>|t|)","Estimate","flag_pvalue", "flag_sign", "flag_vif")]
+  coef_df$flag_sum = rowSums(coef_df[,c("flag_pvalue", "flag_sign", "flag_vif")], na.rm = TRUE) != 0
+  coef_df$"Pr(>|t|)"[coef_df$type=="intercept"] <- coef_df$"Pr(>|t|)"[coef_df$type=="intercept"] -1
+  coef_df$"Pr(>|t|)" <- round(coef_df$"Pr(>|t|)", pvalue_precision)
+  if (discard_sign) {
+    coef_df$Estimate<- abs(coef_df$Estimate)
+  }
+  if (highest_estimate){
+    coef_order<-with(coef_df,order(-flag_sum, -`Pr(>|t|)`, -Estimate))
+  } else {
+    coef_order<-with(coef_df,order(-flag_sum, -`Pr(>|t|)`, Estimate))
+  }
+  coef_df <- coef_df[coef_order,]
+
+  if(sum(coef_df$flag_sum,na.rm=T) || (nrow(coef_df) > run_up_to_flexi_vars)){
+    drop_var<-coef_df$variable[1]
+  } else {
+    drop_var<-NA
+  }
   drop_var
 }
 
@@ -304,32 +179,32 @@ update_model <- function(model, model_data, variable_to_drop) {
 #'
 cleanse_model_singularity <- function(lm_model, model_data, flexible_variables, round_digits = 2, verbose = FALSE) {
   model_vars <- names(stats::coef(lm_model))
-  
+
   # Filter flexible variables present in the model
   flexible_variables <- flexible_variables[flexible_variables %in% model_vars]
-  
+
   repeat {
     aliased_info <- summary(lm_model)$aliased
     singular_vars <- names(aliased_info)[aliased_info]
     singular_vars <- intersect(singular_vars, flexible_variables)
-    
+
     # Break if no singular variables
     if (length(singular_vars) == 0) break
-    
+
     # Calculate linear dependency
     linear_dependency <- apply(stats::alias(lm_model)[[2]], 1, function(x) sum(abs(x[round(abs(x), 1) == 1])))
     singular_vars_dependency <- linear_dependency[names(linear_dependency) %in% singular_vars]
     drop_var <- names(sort(singular_vars_dependency, decreasing = TRUE))[1]
-    
+
     # Verbose output
     if (verbose) {
       message("Dropping variable due to singularity: ", drop_var)
     }
-    
+
     # Update model by removing the most dependent variable
     lm_model <- stats::update(lm_model, formula = stats::as.formula(paste(". ~ . -", drop_var)), data = model_data)
   }
-  
+
   lm_model
 }
 
@@ -373,29 +248,29 @@ cleanse_model_perfect_fit <- function(lm_model, model_data, flexible_variables,
                                       drop_highest_estimate = TRUE,
                                       ignore_estimate_sign = TRUE) {
   model_summary <- summary(lm_model)
-  
+
   # Check for no residual degree of freedom
   if (model_summary$df[2] != 0) {
     return(lm_model)
   }
-  
+
   # Extract and optionally modify estimates for flexible variables
   model_estimate <- stats::coef(lm_model)[flexible_variables]
   if (ignore_estimate_sign) {
     model_estimate <- abs(model_estimate)
   }
-  
+
   # Determine variable to drop based on estimates
   drop_var <- if (drop_highest_estimate) {
     names(which.min(model_estimate))
   } else {
     names(which.max(model_estimate))
   }
-  
+
   # Update the model formula by removing the identified variable
   lm_model <- stats::update(lm_model,
                             formula = stats::as.formula(paste(". ~ . -", drop_var)), data = model_data)
-  
+
   lm_model
 }
 
@@ -431,11 +306,11 @@ calculate_vif <- function(model) {
   if (!inherits(model, c("lm", "glm"))) {
     stop("Input must be a linear model object of class 'lm' or 'glm'.")
   }
-  
+
   # Check if the model includes an intercept
   coef_model <- stats::coef(model)
   has_intercept <- !is.na(coef_model["(Intercept)"])
-  
+
   # Calculate VIF, handling potential errors
   vif_values <- tryCatch({
     # Suppress warnings to handle multicollinearity gracefully
@@ -445,7 +320,7 @@ calculate_vif <- function(model) {
     warning("An error occurred in calculating VIF. Returning Inf for all coefficients. Error: ", e$message)
     rep(Inf, length(coef_model) - if (has_intercept) 1 else 0)
   })
-  
+
   # Add intercept with NA if model has an intercept, otherwise use VIF values directly
   if (has_intercept) {
     vif_result <- c(NA, vif_values)
@@ -453,7 +328,7 @@ calculate_vif <- function(model) {
     vif_result <- vif_values
   }
   names(vif_result) <- names(coef_model)
-  
+
   return(vif_result)
 }
 
@@ -468,18 +343,8 @@ calculate_vif <- function(model) {
 #' @param independent_var_info A data frame with information about independent
 #'   variables in the model. It should contain columns for variable names, adstock,
 #'   power, lag, and the type of variable (e.g., "flexible", "fixed").
-#' @param pos_vars Character vector of variables expected to have a positive
-#'   relationship with the response.
-#' @param neg_vars Character vector of variables expected to have a negative
-#'   relationship with the response.
-#' @param var_agg_delimiter Delimiter used in variable names for aggregation
-#'   (default is "\\|").
 #' @param run_up_to_flexi_vars Integer indicating the number of "flexible"
 #'   variables to consider for retention (default is 10).
-#' @param vif_threshold Threshold for VIF above which variables are considered
-#'   for removal (default is 10).
-#' @param pvalue_thresholds Named numeric vector of p-value thresholds for
-#'   different types of variables (default is c(intercept = 0.15, fixed = 0.15, flexible = 0.15)).
 #' @param drop_pvalue_precision Integer for rounding p-values in the decision
 #'   process (default is 2).
 #' @param discard_estimate_sign Logical; if TRUE, the sign of estimates is
@@ -488,6 +353,9 @@ calculate_vif <- function(model) {
 #'   with the highest estimate (default is FALSE).
 #' @param get_model_object Logical; if TRUE, returns the final model object
 #'   (default is FALSE).
+#' @param always_check_vif Logical; if TRUE, the Variance Inflation Factor (VIF)
+#'   is always checked. If FALSE, VIF will only be checked if there are no flags
+#'   for p-value and no signs for the estimate. Default is FALSE.
 #'
 #' @return A list containing the data frame of model coefficients, the data frame
 #'   of model summary statistics, and optionally the final model object if
@@ -496,26 +364,27 @@ calculate_vif <- function(model) {
 #' @examples
 #' \dontrun{
 #'   advertising <- data.frame(tv = runif(10), radio = runif(10), newspaper = runif(10),
-#'    sales = runif(10))
+#'                            sales = runif(10))
 #'   event <- data.frame(event1 = runif(10), event2 = runif(10))
 #'   lm_model <- lm(sales ~ tv + radio + newspaper + event1 + event2, data = cbind(advertising, event))
 #'   independent_var_info <- data.frame(variable = c("tv", "radio", "newspaper", "event1", "event2"),
 #'                                      type = c("fixed", "fixed", "fixed", "flexible", "flexible"),
 #'                                      adstock = rep(NA, 5), power = rep(NA, 5), lag = rep(NA, 5))
 #'   base_model <- get_base_model(lm_model, cbind(advertising, event), independent_var_info,
-#'                                pos_vars = c("tv", "radio"), neg_vars = c("newspaper"),
-#'                                get_model_object = TRUE)
+#'                                run_up_to_flexi_vars = 10,
+#'                                drop_pvalue_precision = 2, discard_estimate_sign = TRUE,
+#'                                drop_highest_estimate = FALSE, get_model_object = TRUE)
 #' }
 #'
 #' @importFrom dplyr tibble right_join mutate bind_rows
 #' @importFrom tibble rownames_to_column
 #' @importFrom rlang .data
 #'
-get_base_model <- function(lm_model, model_data, independent_var_info, pos_vars, neg_vars,
-                           var_agg_delimiter = "\\|", run_up_to_flexi_vars = 10,
-                           vif_threshold = 10, pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
-                           drop_pvalue_precision = 2, discard_estimate_sign = TRUE, drop_highest_estimate = FALSE,
-                           get_model_object = FALSE) {
+get_base_model <- function(lm_model, model_data, independent_var_info,
+                           run_up_to_flexi_vars = 10,
+                           drop_pvalue_precision = 2, discard_estimate_sign = TRUE,
+                           drop_highest_estimate = FALSE, get_model_object = FALSE,
+                           always_check_vif = FALSE) {
   # Cleanse model for singularity and perfect fit
   lm_model <- cleanse_model_singularity(
     lm_model, model_data,
@@ -528,38 +397,36 @@ get_base_model <- function(lm_model, model_data, independent_var_info, pos_vars,
     drop_highest_estimate = FALSE,
     ignore_estimate_sign = TRUE
   )
-  
+
   # Initialize loop and data frames to store results
   loop_id <- 1
   model_coef_all <- tibble::tibble()
   model_smry_all <- tibble::tibble()
-  
+
   # Begin variable dropping loop
   repeat {
     # Get summary of the current model
     lm_model_smry <- summary(lm_model)
-    # Determine coefficients and flags
-    model_coef <- independent_var_info %>%
-      dplyr::right_join(
-        as.data.frame(lm_model_smry$coefficients) %>%
-          tibble::rownames_to_column('variable') %>%
-          dplyr::mutate(variable = stringr::str_replace_all(.data$variable, "`", ""),
-                        vif = calculate_vif(lm_model)) %>%
-          tibble::tibble(), by = "variable"
-      ) %>%
-      dplyr::mutate(
-        loop_id = loop_id,
-        flag_pvalue = determine_pvalue_flag(.data$type, .data$`Pr(>|t|)`, pvalue_thresholds),
-        expected_sign = determine_expected_sign(.data$variable, pos_vars, neg_vars, var_agg_delimiter),
-        flag_sign = (.data$Estimate > 0) != .data$expected_sign,
-        flag_vif = determine_vif_flag(.data$type, .data$vif, vif_threshold)
-      ) %>%
-      dplyr::select(-"expected_sign")
-    
+    model_coef<-as.data.frame(lm_model_smry$coefficients)
+    model_coef$variable<-gsub("`", "", rownames(model_coef))
+    model_coef<-merge(model_coef,independent_var_info, by ="variable", all.x=T, sort = F)
+    model_coef$loop_id <- loop_id
+    model_coef$flag_pvalue <- model_coef$`Pr(>|t|)`> model_coef$critical_pvalue
+    model_coef$flag_sign <- (model_coef$Estimate > 0) != model_coef$expected_sign
+    if(always_check_vif || !any(c(model_coef$flag_pvalue,model_coef$flag_sign),na.rm=T)){
+      model_coef$vif <- calculate_vif(lm_model)
+    } else {
+      model_coef$vif <- NA
+    }
+    model_coef$flag_vif = model_coef$vif > model_coef$critical_vif
+    model_coef<-model_coef[,c("loop_id", "variable", "type", "adstock", "power", "lag", "sum", "Estimate",
+                  "Std. Error", "t value", "Pr(>|t|)", "vif", "flag_pvalue", "flag_sign", "flag_vif")]
+
+
     # Accumulate results
     model_coef_all <- dplyr::bind_rows(model_coef_all, model_coef)
     model_smry_all <- dplyr::bind_rows(model_smry_all, summarize_model(lm_model_smry, loop_id))
-    
+
     # Identify variable to drop based on the current model
     variable_to_drop <- identify_drop_variable(
       model_coef,
@@ -568,23 +435,23 @@ get_base_model <- function(lm_model, model_data, independent_var_info, pos_vars,
       drop_highest_estimate,
       run_up_to_flexi_vars
     )
-    
+
     # Break loop if no variable is identified to drop
     if (is.na(variable_to_drop) || !length(variable_to_drop)) {
       break
     }
-    
+
     # Update loop counter and model
     loop_id <- loop_id + 1
     lm_model <- update_model(lm_model, model_data, variable_to_drop)
   }
-  
+
   # Return results
   if (get_model_object) {
     coef_smry_lm <- list(model_coef_all, model_smry_all, lm_model)
   } else {
     coef_smry_lm <- list(model_coef_all, model_smry_all, NA)
   }
-  
+
   return(coef_smry_lm)
 }
