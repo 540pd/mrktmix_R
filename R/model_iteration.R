@@ -14,6 +14,9 @@
 #' @param model_dep_df A dataframe containing the dependent variable.
 #' @param with_intercept Logical; if TRUE, an intercept is included in the model.
 #'   Default is TRUE.
+#' @param drop_flexi_vars Logical; specifies the method for handling flexible variables.
+#'   If TRUE, flexible variables are dropped iteratively. If FALSE, independent
+#'   variables are tested only once in the model.
 #' @param run_up_to_flexi_vars An integer representing the number of flexible
 #'   variables to consider up to. Default is 0.
 #' @param drop_pvalue_precision The precision for the p-value to drop variables.
@@ -66,7 +69,7 @@
 #'
 assemble_base_models <- function(candidate_predictors, candidate_predictors_info, model_indep_df, model_dep_df,
                                  with_intercept = TRUE,
-                                 run_up_to_flexi_vars = 0,
+                                 drop_flexi_vars = TRUE, run_up_to_flexi_vars = 0,
                                  drop_pvalue_precision = 2, discard_estimate_sign = TRUE, drop_highest_estimate = FALSE,
                                  get_model_object = FALSE, always_check_vif = FALSE) {
   # Apply the 'apl' function on independent variables and replace NA with zero
@@ -86,7 +89,7 @@ assemble_base_models <- function(candidate_predictors, candidate_predictors_info
 
   get_base_model(
     lm_model, modeling_df,independent_variable_info,
-    run_up_to_flexi_vars,
+    drop_flexi_vars, run_up_to_flexi_vars,
     drop_pvalue_precision, discard_estimate_sign , drop_highest_estimate ,
     get_model_object,
     always_check_vif
@@ -150,7 +153,8 @@ assemble_base_models <- function(candidate_predictors, candidate_predictors_info
 collate_base_models <- function(candidate_variables_list, model_df, model_dep_df,
                                 pos_sign_variables, neg_sign_variables,  base_variables = NA,
                                 with_intercept = TRUE,
-                                var_agg_delimiter = "|", run_up_to_flexi_vars = 0,
+                                var_agg_delimiter = "|",
+                                drop_flexi_vars = TRUE, run_up_to_flexi_vars = 0,
                                 vif_threshold = 10, pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
                                 drop_pvalue_precision = 2, discard_estimate_sign = TRUE, drop_highest_estimate = FALSE,
                                 get_model_object = FALSE, always_check_vif = FALSE) {
@@ -173,13 +177,14 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
   }
 
   candidate_variables_df<-purrr::map_dfr(candidate_variables_list, function(candidate_variables_l){
-        apl_df<-lapply(candidate_variables_l, function(df) as.data.frame(t(data.frame(df, check.names = F))))
-        apl_df_wt_names<- purrr::map2(names(candidate_variables_l), apl_df, function(type_of_var,df) {
-            df$type <- type_of_var
-            df$variable <- row.names(df)
-            df
-        })
-      apl_df_wt_names},.id = "model_id")
+    fixed<-data.frame(t(data.frame(candidate_variables_l[[1]])))
+    fixed$type<-"fixed"
+    flexible<-data.frame(t(data.frame(candidate_variables_l[[2]])))
+    flexible$type<-"flexible"
+    combined_ff<-rbind(fixed,flexible)
+    combined_ff$variable<-row.names(combined_ff)
+    combined_ff
+  }, .id = "model_id")
 
   if (with_intercept) {
     intercetp_df<-data.frame(variable ="(Intercept)", adstock = NA, power = NA, lag = NA, type = "intercept", row.names = "(Intercept)")
@@ -209,7 +214,7 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
   base_models <- purrr::pmap(list(candidate_variables_list,candidate_variables_df_list), function(candidate_predictors,candidate_predictors_info)
     assemble_base_models(
       candidate_predictors, candidate_predictors_info, model_df, model_dep_df_modified,
-      with_intercept, run_up_to_flexi_vars,
+      with_intercept, drop_flexi_vars, run_up_to_flexi_vars,
       drop_pvalue_precision, discard_estimate_sign, drop_highest_estimate,
       get_model_object, always_check_vif)
   )
@@ -308,10 +313,10 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
 collate_models<-function(candidate_variables_list, model_df, dep_var_info,
                          with_intercept,
                          base_variables,
-                         run_up_to_flexi_vars = NA,
                          pos_sign_variables = NA, neg_sign_variables = NA,
                          mdl_start_date=NA, mdl_end_date=NA,
                          var_agg_delimiter = "|",apl_delimiter = "_",var_apl_delimiter = "|",
+                         drop_flexi_vars = TRUE, run_up_to_flexi_vars = NA,
                          vif_threshold = 10, pvalue_thresholds = c(intercept = 0.15, fixed = 0.15, flexible = 0.15),
                          drop_pvalue_precision = 2, drop_discard_estimate_sign = TRUE, drop_highest_estimate = FALSE,
                          get_model_object = FALSE, always_check_vif = FALSE){
@@ -342,7 +347,8 @@ collate_models<-function(candidate_variables_list, model_df, dep_var_info,
   model_result <- purrr::map(dep_apl_df_list[[2]],~collate_base_models(candidate_variables_list,  model_df_rel, .x ,
                                                                        pos_sign_variables , neg_sign_variables ,
                                                                        base_variables, with_intercept,
-                                                                       var_agg_delimiter , run_up_to_flexi_vars,
+                                                                       var_agg_delimiter ,
+                                                                       drop_flexi_vars, run_up_to_flexi_vars,
                                                                        vif_threshold, pvalue_thresholds,
                                                                        drop_pvalue_precision, drop_discard_estimate_sign, drop_highest_estimate,
                                                                        get_model_object, always_check_vif ))
