@@ -340,6 +340,9 @@ calculate_vif <- function(model) {
 #'
 #' @param lm_model A linear model object (of class \code{\link[stats]{lm}}) to be processed.
 #' @param model_data Data used for fitting \code{lm_model}.
+#' @param drop_flexi_vars Logical; specifies the method for handling flexible variables.
+#'   If TRUE, flexible variables are dropped iteratively. If FALSE, independent
+#'   variables are tested only once in the model.
 #' @param independent_var_info A data frame with information about independent
 #'   variables in the model. It should contain columns for variable names, adstock,
 #'   power, lag, and the type of variable (e.g., "flexible", "fixed").
@@ -381,7 +384,7 @@ calculate_vif <- function(model) {
 #' @importFrom rlang .data
 #'
 get_base_model <- function(lm_model, model_data, independent_var_info,
-                           run_up_to_flexi_vars = 10,
+                           drop_flexi_vars=TRUE, run_up_to_flexi_vars = 10,
                            drop_pvalue_precision = 2, discard_estimate_sign = TRUE,
                            drop_highest_estimate = FALSE, get_model_object = FALSE,
                            always_check_vif = FALSE) {
@@ -426,6 +429,11 @@ get_base_model <- function(lm_model, model_data, independent_var_info,
     # Accumulate results
     model_coef_all <- dplyr::bind_rows(model_coef_all, model_coef)
     model_smry_all <- dplyr::bind_rows(model_smry_all, summarize_model(lm_model_smry, loop_id))
+
+    # Break loop if no variable is identified to drop
+    if (!drop_flexi_vars) {
+      break
+    }
 
     # Identify variable to drop based on the current model
     variable_to_drop <- identify_drop_variable(
