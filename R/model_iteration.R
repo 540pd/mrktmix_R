@@ -214,7 +214,7 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
       candidate_predictors, candidate_predictors_info, model_df, model_dep_df_modified,
       with_intercept, drop_flexi_vars, run_up_to_flexi_vars,
       drop_pvalue_precision, discard_estimate_sign, drop_highest_estimate,
-      get_model_object, always_check_vif)
+      get_model_object, always_check_vif),.progress = TRUE
   )
 
 
