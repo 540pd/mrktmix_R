@@ -1,6 +1,6 @@
 Package: mrktmix
 Title: Market Mix Modeling
-Version: 0.0.0.4
+Version: 0.0.1.0
 Date: 2023-10-22
 Depends: R (>= 3.1)
 Imports: dplyr, purrr, stringr, car, magrittr, tidyselect, tibble, tidyr, rlang, pbapply
