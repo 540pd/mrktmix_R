@@ -163,7 +163,6 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
   stopifnot(is.list(candidate_variables_list))
   stopifnot(is.data.frame(model_df))
   stopifnot(is.data.frame(model_dep_df))
-
   dependent_sum <- sum(model_dep_df$Y)
 
   if(any(!is.na(base_variables))){
@@ -176,15 +175,14 @@ collate_base_models <- function(candidate_variables_list, model_df, model_dep_df
     model_dep_df_modified<-model_dep_df
   }
 
-  candidate_variables_df<-purrr::map_dfr(candidate_variables_list, function(candidate_variables_l){
-    fixed<-data.frame(t(data.frame(candidate_variables_l[[1]])))
-    fixed$type<-"fixed"
-    flexible<-data.frame(t(data.frame(candidate_variables_l[[2]])))
-    flexible$type<-"flexible"
-    combined_ff<-rbind(fixed,flexible)
-    combined_ff$variable<-row.names(combined_ff)
-    combined_ff
-  }, .id = "model_id")
+ candidate_variables_df<-purrr::map_dfr(candidate_variables_list, function(candidate_variables_l){
+        apl_df<-lapply(candidate_variables_l, function(df) as.data.frame(t(data.frame(df, check.names = F))))
+        apl_df_wt_names<- purrr::map2(names(candidate_variables_l), apl_df, function(type_of_var,df) {
+            df$type <- type_of_var
+            df$variable <- row.names(df)
+            df
+        })
+      dplyr::bind_rows(apl_df_wt_names)},.id = "model_id")
 
   if (with_intercept) {
     intercetp_df<-data.frame(variable ="(Intercept)", adstock = NA, power = NA, lag = NA, type = "intercept", row.names = "(Intercept)")
