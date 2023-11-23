@@ -28,16 +28,22 @@
 #'   print(composed_names)
 #' }
 #'
-compose_variable_apl <- function(variables_wt_named_apl, apl_delimiter = "_", delimiter = "|") {
-  # Compose variable names with their APL attributes into a standardized format
-  result <- mapply(function(name, values) {
-    # Concatenate each value with the variable name using the provided delimiters
-    paste(name, paste(unlist(values), collapse = apl_delimiter), sep = delimiter)
-  }, names(variables_wt_named_apl), variables_wt_named_apl, SIMPLIFY = FALSE)
+compose_variable_apl <-
+  function(variables_wt_named_apl,
+           apl_delimiter = "_",
+           delimiter = "|") {
+    # Compose variable names with their APL attributes into a standardized format
+    result <- mapply(function(name, values) {
+      # Concatenate each value with the variable name using the provided delimiters
+      paste(name, paste(unlist(values), collapse = apl_delimiter), sep = delimiter)
+    },
+    names(variables_wt_named_apl),
+    variables_wt_named_apl,
+    SIMPLIFY = FALSE)
 
-  # Combine the result into a single character vector without names
-  unname(unlist(result))
-}
+    # Combine the result into a single character vector without names
+    unname(unlist(result))
+  }
 
 #' Parse Variable with Adstock, Power, and Lag
 #'
@@ -69,31 +75,49 @@ compose_variable_apl <- function(variables_wt_named_apl, apl_delimiter = "_", de
 #'
 #' @importFrom stats na.omit
 #'
-parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimiter = "|") {
+parse_variable_wt_apl <-
+  function(variables_wt_apl,
+           apl_delimiter = "_",
+           delimiter = "|") {
+    # Escape the special characters in regular expression
+    escaped_delimiter <-
+      gsub("([.|()\\[^$?*+])", "\\\\\\1", delimiter)
+    escaped_apl_delimiter <-
+      gsub("([.|()\\[^$?*+])", "\\\\\\1", apl_delimiter)
 
-  # Escape the special characters in regular expression
-  escaped_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", delimiter)
-  escaped_apl_delimiter <- gsub("([.|()\\[^$?*+])", "\\\\\\1", apl_delimiter)
+    regex_pattern <-
+      paste0(
+        "(.+?)",
+        escaped_delimiter,
+        "([0-9.]+",
+        escaped_apl_delimiter,
+        "?[0-9.]*",
+        escaped_apl_delimiter,
+        "?[0-9.]*)$"
+      )
 
-  regex_pattern <- paste0("(.+?)", escaped_delimiter, "([0-9.]+", escaped_apl_delimiter, "?[0-9.]*", escaped_apl_delimiter, "?[0-9.]*)$")
+    matches <- stringr::str_match(variables_wt_apl, regex_pattern)
 
-  matches <- stringr::str_match(variables_wt_apl, regex_pattern)
+    if (any(!stats::complete.cases(matches))) {
+      matches[!stats::complete.cases(matches), ] <-
+        c(variables_wt_apl[!stats::complete.cases(matches)],
+          variables_wt_apl[!stats::complete.cases(matches)],
+          paste(0, 1, 0, sep = apl_delimiter))
+    }
+    if (any(is.na(matches))) {
+      warning("Some inputs did not match the expected format and will be omitted.")
+      matches <- na.omit(matches)
+    }
 
-  if(any(!stats::complete.cases(matches))){
-    matches[!stats::complete.cases(matches),]<-c(variables_wt_apl[!stats::complete.cases(matches)], variables_wt_apl[!stats::complete.cases(matches)], paste(0,1,0,sep=apl_delimiter))
+    data.frame(
+      variable = matches[, 2],
+      adstock = as.numeric(stringr::str_extract(matches[, 3], "^[0-9.]+")),
+      power = as.numeric(stringr::str_extract(
+        stringr::str_replace(matches[, 3], "^[0-9.]+_", ""), "^[0-9.]+"
+      )),
+      lag = as.numeric(stringr::str_extract(matches[, 3], "[0-9.]+$"))
+    )
   }
-  if (any(is.na(matches))) {
-    warning("Some inputs did not match the expected format and will be omitted.")
-    matches <- na.omit(matches)
-  }
-
-  data.frame(
-    variable = matches[, 2],
-    adstock = as.numeric(stringr::str_extract(matches[, 3], "^[0-9.]+")),
-    power = as.numeric(stringr::str_extract(stringr::str_replace(matches[, 3], "^[0-9.]+_", ""), "^[0-9.]+")),
-    lag = as.numeric(stringr::str_extract(matches[, 3], "[0-9.]+$"))
-  )
-}
 
 #' Aggregate Columns in a Data Frame
 #'
@@ -118,12 +142,22 @@ parse_variable_wt_apl <- function(variables_wt_apl, apl_delimiter = "_", delimit
 #'   aggregate_columns(advertising, c("Sales", "TV|Radio|Newspaper"), delimiter = "|")
 #' }
 #'
-aggregate_columns <- function(modeling_df, aggregated_variables, delimiter = "|") {
-  individual_variables <- stringr::str_split(aggregated_variables, stringr::fixed(delimiter))
-  aggregated_vals <- lapply(individual_variables, function(x) apply(modeling_df[, x, drop = FALSE], 1, sum, na.rm = TRUE))
-  aggregated_df <- as.data.frame(do.call(cbind, stats::setNames(aggregated_vals, aggregated_variables)))
-  return(aggregated_df)
-}
+aggregate_columns <-
+  function(modeling_df,
+           aggregated_variables,
+           delimiter = "|") {
+    individual_variables <-
+      stringr::str_split(aggregated_variables, stringr::fixed(delimiter))
+    aggregated_vals <-
+      lapply(individual_variables, function(x)
+        apply(modeling_df[, x, drop = FALSE], 1, sum, na.rm = TRUE))
+    aggregated_df <-
+      as.data.frame(do.call(
+        cbind,
+        stats::setNames(aggregated_vals, aggregated_variables)
+      ))
+    return(aggregated_df)
+  }
 
 #' Decompose Model Component with Adstock, Power, and Lag (APL) Transformations
 #'
@@ -168,73 +202,97 @@ aggregate_columns <- function(modeling_df, aggregated_variables, delimiter = "|"
 #' @importFrom tidyselect everything
 #' @export
 #'
-decompose_model_component <- function(variables_wt_weights, model_df,
-                                      is_weight_coefficient = TRUE,
-                                      apl_delimiter = "_",
-                                      delimiter = "|",
-                                      var_agg_delimiter="|") {
-  # Treat weights as coefficients if is_weight_coefficient is TRUE, otherwise as contributions
+decompose_model_component <-
+  function(variables_wt_weights,
+           model_df,
+           is_weight_coefficient = TRUE,
+           apl_delimiter = "_",
+           delimiter = "|",
+           var_agg_delimiter = "|") {
+    # Treat weights as coefficients if is_weight_coefficient is TRUE, otherwise as contributions
 
-  model_df_selected <- model_df %>%
-    dplyr::select(any_of(names(variables_wt_weights)))
+    model_df_selected <- model_df %>%
+      dplyr::select(any_of(names(variables_wt_weights)))
 
-  # Remaining variables after selection
-  variables_wt_weights_left <- variables_wt_weights[!names(variables_wt_weights) %in% names(model_df_selected)]
+    # Remaining variables after selection
+    variables_wt_weights_left <-
+      variables_wt_weights[!names(variables_wt_weights) %in% names(model_df_selected)]
 
-  # Check for the presence of an intercept term and include it if present
-  intercept_key <- c("Intercept","intercept","(Intercept)")
-  intercept_exists <- names(variables_wt_weights_left) %in% intercept_key
-  if (any(intercept_exists)) {
-    # model_df_selected[,names(variables_wt_weights_left[intercept_exists])] <- variables_wt_weights_left[intercept_exists]
-    model_df_selected[,names(variables_wt_weights_left[intercept_exists])] <- 1
-    variables_wt_weights_left <- variables_wt_weights_left[!intercept_exists]
+    # Check for the presence of an intercept term and include it if present
+    intercept_key <- c("Intercept", "intercept", "(Intercept)")
+    intercept_exists <-
+      names(variables_wt_weights_left) %in% intercept_key
+    if (any(intercept_exists)) {
+      # model_df_selected[,names(variables_wt_weights_left[intercept_exists])] <- variables_wt_weights_left[intercept_exists]
+      model_df_selected[, names(variables_wt_weights_left[intercept_exists])] <-
+        1
+      variables_wt_weights_left <-
+        variables_wt_weights_left[!intercept_exists]
+    }
+
+    if (length(variables_wt_weights_left)) {
+      # Parse variables for APL information
+      variable_info <-
+        parse_variable_wt_apl(names(variables_wt_weights_left),
+                              apl_delimiter,
+                              delimiter)
+      # update variables_wt_weights names
+      variables_wt_weights_captured <-
+        variables_wt_weights[!names(variables_wt_weights) %in% names(variables_wt_weights_left)]
+      variables_wt_weights_apl <-
+        setNames(variables_wt_weights_left, variable_info$variable)
+      names(variables_wt_weights)[names(variables_wt_weights) %in% names(variables_wt_weights_left)] <-
+        names(variables_wt_weights_apl)
+
+      # Create APL information list using pmap
+      apl_info <-
+        purrr::pmap(variable_info, function(variable, adstock, power, lag) {
+          setNames(c(adstock, power, lag), names(variable_info)[-1])
+        }) %>%
+        setNames(variable_info$variable)
+
+      # Dependent Data - create aggregation if required
+      vars_in_model_df_logical <-
+        names(apl_info) %in%  names(model_df)
+      vars_expected_model_df <-
+        names(apl_info)[!vars_in_model_df_logical]
+      model_df_rel <-
+        aggregate_columns(model_df,
+                          c(vars_expected_model_df, names(apl_info)[vars_in_model_df_logical]) ,
+                          var_agg_delimiter)
+
+
+      # Apply APL transformations and recombine with the selected data
+      model_df_transformed <- apply_apl(model_df_rel, apl_info)
+      model_df_combined <- model_df_selected %>%
+        dplyr::bind_cols(model_df_transformed) %>%
+        dplyr::select(tidyr::all_of(names(variables_wt_weights)))
+    } else {
+      model_df_combined <- model_df_selected %>%
+        dplyr::select(tidyr::all_of(names(variables_wt_weights)))
+    }
+
+    model_df_combined_est <- model_df_combined %>%
+      dplyr::mutate(dplyr::across(any_of(names(
+        variables_wt_weights
+      )),
+      ~ .x * variables_wt_weights[dplyr::cur_column()]),
+      .keep = "used")
+
+
+    # Adjust for weight coefficients if not treating as coefficients
+    if (!is_weight_coefficient) {
+      model_df_combined_est <- model_df_combined_est %>%
+        dplyr::mutate(dplyr::across(everything(), ~ .x / sum(.x, na.rm = TRUE) * {
+          {
+            variables_wt_weights
+          }
+        }[dplyr::cur_column()]))
+    }
+
+    # Return the final model dataframe with applied transformations
+    return(model_df_combined_est)
   }
-
-  if(length(variables_wt_weights_left)){
-    # Parse variables for APL information
-    variable_info <- parse_variable_wt_apl(names(variables_wt_weights_left), apl_delimiter, delimiter)
-    # update variables_wt_weights names
-    variables_wt_weights_captured <- variables_wt_weights[!names(variables_wt_weights) %in% names(variables_wt_weights_left)]
-    variables_wt_weights_apl <- setNames(variables_wt_weights_left, variable_info$variable)
-    names(variables_wt_weights)[names(variables_wt_weights) %in% names(variables_wt_weights_left)]<-names(variables_wt_weights_apl)
-
-    # Create APL information list using pmap
-    apl_info <- purrr::pmap(variable_info, function(variable, adstock, power, lag) {
-      setNames(c(adstock, power, lag), names(variable_info)[-1])
-    }) %>%
-      setNames(variable_info$variable)
-
-    # Dependent Data - create aggregation if required
-    vars_in_model_df_logical<-names(apl_info) %in%  names(model_df)
-    vars_expected_model_df<-names(apl_info)[!vars_in_model_df_logical]
-    model_df_rel<-aggregate_columns(model_df, c(vars_expected_model_df, names(apl_info)[vars_in_model_df_logical]) ,  var_agg_delimiter)
-
-
-    # Apply APL transformations and recombine with the selected data
-    model_df_transformed <- apply_apl(model_df_rel, apl_info)
-    model_df_combined <- model_df_selected %>%
-      dplyr::bind_cols(model_df_transformed) %>%
-      dplyr::select(tidyr::all_of(names(variables_wt_weights)))
-  } else {
-    model_df_combined <- model_df_selected %>%
-      dplyr::select(tidyr::all_of(names(variables_wt_weights)))
-  }
-
-  model_df_combined_est <- model_df_combined %>%
-    dplyr::mutate(dplyr::across(any_of(names(variables_wt_weights)),
-                                ~ .x * variables_wt_weights[dplyr::cur_column()]),
-                  .keep = "used")
-
-
-  # Adjust for weight coefficients if not treating as coefficients
-  if (!is_weight_coefficient) {
-    model_df_combined_est <- model_df_combined_est %>%
-      dplyr::mutate(dplyr::across(everything(), ~ .x / sum(.x, na.rm = TRUE) * {{variables_wt_weights}}[dplyr::cur_column()]))
-  }
-
-  # Return the final model dataframe with applied transformations
-  return(model_df_combined_est)
-}
 
 #' Generate Model-Dependent Data Frames with APL Transformations
 #'
@@ -284,50 +342,89 @@ decompose_model_component <- function(variables_wt_weights, model_df,
 #' @importFrom tibble enframe as_tibble
 #' @importFrom tidyr unnest_wider
 #'
-generate_model_dependent <- function(var_info, model_df,
+generate_model_dependent <- function(var_info,
+                                     model_df,
                                      apl_delimiter = "_",
-                                     var_apl_delimiter = "|", var_agg_delimiter = "|") {
-  if(is.vector(var_info) && is.character(var_info)){
-    var_info <- setNames(sapply(model_df[,var_info, drop=FALSE],sum, na.rm=T),paste(var_info, var_apl_delimiter,0,apl_delimiter,1,apl_delimiter,0, sep =""))
+                                     var_apl_delimiter = "|",
+                                     var_agg_delimiter = "|") {
+  if (is.vector(var_info) && is.character(var_info)) {
+    var_info <-
+      setNames(
+        sapply(model_df[, var_info, drop = FALSE], sum, na.rm = T),
+        paste(
+          var_info,
+          var_apl_delimiter,
+          0,
+          apl_delimiter,
+          1,
+          apl_delimiter,
+          0,
+          sep = ""
+        )
+      )
   }
 
-  if (is.vector(var_info) && is.numeric(var_info) && all(!is.na(names(var_info)))) {
-
-    # # Dependent Data - create aggregation if required
-    # vars_in_model_df_logical<-names(var_info) %in%  names(model_df)
-    # vars_expected_model_df<-names(var_info)[!vars_in_model_df_logical] %>%
-    #   parse_variable_wt_apl(apl_delimiter, var_apl_delimiter) %>%
-    #   dplyr::pull("variable") %>%
-    #   c(names(var_info)[vars_in_model_df_logical])
-    # model_df_rel<-aggregate_columns(model_df, vars_expected_model_df,  var_agg_delimiter)
-
+  if (is.vector(var_info) &&
+      is.numeric(var_info) && all(!is.na(names(var_info)))) {
     # Process named vector
     apl_df_list <- list(
-      decompose_model_component(var_info, model_df,
-                                is_weight_coefficient = FALSE,
-                                apl_delimiter = apl_delimiter,
-                                delimiter = var_apl_delimiter,
-                                var_agg_delimiter = var_agg_delimiter
+      decompose_model_component(
+        var_info,
+        model_df,
+        is_weight_coefficient = FALSE,
+        apl_delimiter = apl_delimiter,
+        delimiter = var_apl_delimiter,
+        var_agg_delimiter = var_agg_delimiter
       ) %>%
-        dplyr::mutate(dplyr::across(everything(), ~tidyr::replace_na(.x, 0)))
+        dplyr::mutate(dplyr::across(
+          everything(), ~ tidyr::replace_na(.x, 0)
+        ))
     )
-    var_apl_info <- parse_variable_wt_apl(names(var_info), apl_delimiter, var_apl_delimiter)
+    var_apl_info <-
+      list(parse_variable_wt_apl(names(var_info), apl_delimiter, var_apl_delimiter))
 
   } else {
-    # Dependent Data - create aggregation if required
-    model_df_rel<-aggregate_columns(model_df, names(var_info), var_agg_delimiter)
+    if (all(c("adstock", "power", "lag", "constraints") %in% names(var_info[[1]]))) {
+      # Dependent Data - create aggregation if required
+      model_df_rel <-
+        aggregate_columns(model_df, names(var_info), var_agg_delimiter)
 
-    # Process list
-    var_wt_apl <- generate_variable_combination(var_info)
-    apl_df_list <- purrr::map(var_wt_apl, ~apply_apl(model_df_rel, .x) %>%
-                                dplyr::mutate(dplyr::across(everything(), ~tidyr::replace_na(.x, 0))))
-    var_apl_info <- var_wt_apl %>%
-      purrr::flatten() %>%
-      tibble::enframe(name = "variable", value = "named_vector") %>%
-      tidyr::unnest_wider("named_vector") %>%
-      tibble::as_tibble()
+      # Process list
+      var_wt_apl <- generate_variable_combination(var_info)
+      apl_df_list <-
+        purrr::map(var_wt_apl,
+                   ~ apply_apl(model_df_rel, .x) %>%
+                     dplyr::mutate(dplyr::across(
+                       everything(), ~ tidyr::replace_na(.x, 0)
+                     )))
+
+      var_apl_info <- lapply(var_wt_apl, function(x)
+        data.frame(matrix(
+          x[[1]],
+          nrow = 1,
+          dimnames = list(names(x[1]), names(x[[1]]))
+        )) %>% tibble::rownames_to_column("variable"))
+
+    } else {
+      apl_df_list <- lapply(var_info, function(x)
+        decompose_model_component(
+          x,
+          model_df,
+          is_weight_coefficient = FALSE,
+          apl_delimiter = apl_delimiter,
+          delimiter = var_apl_delimiter,
+          var_agg_delimiter = var_agg_delimiter
+        ) %>%
+          dplyr::mutate(dplyr::across(
+            everything(), ~ tidyr::replace_na(.x, 0)
+          )))
+
+      var_apl_info <-
+        lapply(var_info, function(x)
+          parse_variable_wt_apl(names(x), apl_delimiter, var_apl_delimiter))
+
+    }
   }
-
   list(var_apl_info, apl_df_list)
 }
 
@@ -368,49 +465,73 @@ generate_model_dependent <- function(var_info, model_df,
 #'   get_dep_indep_vars("TV_0_1_0+Sales|Radio_0_1_0", var_agg_delimiter = "|")
 #' }
 #'
-get_dep_indep_vars <- function(model_variable, var_agg_delimiter = "|", trim = TRUE, print_model_type = TRUE) {
-  # Determine model type based on the presence of characters + and -
-  model_type <- if (!stringr::str_detect(model_variable, "[+-]")) {
-    "Remodel"
-  } else if (stringr::str_detect(model_variable, "\\+") & stringr::str_detect(model_variable, "-")) {
-    "Aggregate & Segregate"
-  } else if (stringr::str_detect(model_variable, "-")) {
-    "Segregate"
-  } else if (stringr::str_detect(model_variable, "\\+")) {
-    "Aggregate"
+get_dep_indep_vars <-
+  function(model_variable,
+           var_agg_delimiter = "|",
+           trim = TRUE,
+           print_model_type = TRUE) {
+    # Determine model type based on the presence of characters + and -
+    model_type <-
+      if (!stringr::str_detect(model_variable, "[+-]")) {
+        "Remodel"
+      } else if (stringr::str_detect(model_variable, "\\+") &
+                 stringr::str_detect(model_variable, "-")) {
+        "Aggregate & Segregate"
+      } else if (stringr::str_detect(model_variable, "-")) {
+        "Segregate"
+      } else if (stringr::str_detect(model_variable, "\\+")) {
+        "Aggregate"
+      }
+
+    # Print the determined model type if requested
+    if (print_model_type) {
+      cat("Model Type:", model_type, "\n")
+    }
+
+    # Initialize variables for dependent and independent variables
+    dep_var_rel <- indep_vars <- character()
+
+    # Based on the model type, process the model variable
+    if (model_type == "Remodel") {
+      dep_var_rel <- model_variable
+      indep_vars <- model_variable
+    } else if (model_type == "Aggregate") {
+      dep_var_rel <- unlist(str_split(model_variable, "\\+"))
+      indep_vars <-
+        stringr::str_replace_all(model_variable, "\\+", var_agg_delimiter)
+    } else if (model_type == "Aggregate & Segregate") {
+      dep_var_rel <-
+        stringr::str_replace_all(str_replace(
+          unlist(str_split(model_variable, "\\+")),
+          paste0("^-", var_agg_delimiter, "-$"),
+          ""
+        ), "-", var_agg_delimiter)
+      indep_vars <-
+        stringr::str_replace_all(str_replace(
+          unlist(str_split(model_variable, "-")),
+          paste0("^\\+", var_agg_delimiter, "\\+$"),
+          ""
+        ),
+        "\\+",
+        var_agg_delimiter)
+    } else if (model_type == "Segregate") {
+      dep_var_rel <-
+        stringr::str_replace_all(model_variable, "-", var_agg_delimiter)
+      indep_vars <- unlist(stringr::str_split(model_variable, "-"))
+    }
+
+    if (trim) {
+      dep_var_rel <-
+        unlist(lapply(stringr::str_split(dep_var_rel, stringr::fixed(var_agg_delimiter)), function(x)
+          paste0(stringr::str_trim(x, side = c("both")), collapse = var_agg_delimiter)))
+      indep_vars <-
+        unlist(lapply(stringr::str_split(indep_vars, stringr::fixed(var_agg_delimiter)), function(x)
+          paste0(stringr::str_trim(x, side = c("both")), collapse = var_agg_delimiter)))
+    }
+
+    # Return a list containing the processed dependent and independent variables
+    return(list(dependent_var = dep_var_rel, independent_var = indep_vars))
   }
-
-  # Print the determined model type if requested
-  if (print_model_type) {
-    cat("Model Type:", model_type, "\n")
-  }
-
-  # Initialize variables for dependent and independent variables
-  dep_var_rel <- indep_vars <- character()
-
-  # Based on the model type, process the model variable
-  if (model_type == "Remodel") {
-    dep_var_rel <- model_variable
-    indep_vars <- model_variable
-  } else if (model_type == "Aggregate") {
-    dep_var_rel <- unlist(str_split(model_variable, "\\+"))
-    indep_vars <- stringr::str_replace_all(model_variable, "\\+", var_agg_delimiter)
-  } else if (model_type == "Aggregate & Segregate") {
-    dep_var_rel <- stringr::str_replace_all(str_replace(unlist(str_split(model_variable, "\\+")), paste0("^-",var_agg_delimiter,"-$"), ""), "-", var_agg_delimiter)
-    indep_vars <- stringr::str_replace_all(str_replace(unlist(str_split(model_variable, "-")), paste0("^\\+",var_agg_delimiter,"\\+$"), ""), "\\+", var_agg_delimiter)
-  } else if (model_type == "Segregate") {
-    dep_var_rel <- stringr::str_replace_all(model_variable, "-", var_agg_delimiter)
-    indep_vars <- unlist(stringr::str_split(model_variable, "-"))
-  }
-
-  if(trim){
-    dep_var_rel<-unlist(lapply(stringr::str_split(dep_var_rel,stringr::fixed(var_agg_delimiter)), function(x) paste0(stringr::str_trim(x, side = c("both")),collapse = var_agg_delimiter)))
-    indep_vars<-unlist(lapply(stringr::str_split(indep_vars,stringr::fixed(var_agg_delimiter)), function(x) paste0(stringr::str_trim(x, side = c("both")),collapse = var_agg_delimiter)))
-  }
-
-  # Return a list containing the processed dependent and independent variables
-  return(list(dependent_var = dep_var_rel, independent_var = indep_vars))
-}
 
 #' Determine the Expected Sign of Model Coefficients
 #'
@@ -457,18 +578,27 @@ get_dep_indep_vars <- function(model_variable, var_agg_delimiter = "|", trim = T
 #'   determine_expected_sign("sales|other", pos_vars, neg_vars, "|") # Returns NA
 #' }
 #'
-determine_expected_sign <- function(variable, pos_vars, neg_vars, var_agg_delimiter) {
-  expected_pos <- lapply(stringr::str_split(variable, stringr::fixed(var_agg_delimiter)), `%in%`, pos_vars)
-  expected_neg <- lapply(stringr::str_split(variable, stringr::fixed(var_agg_delimiter)), `%in%`, neg_vars)
+determine_expected_sign <-
+  function(variable,
+           pos_vars,
+           neg_vars,
+           var_agg_delimiter) {
+    expected_pos <-
+      lapply(stringr::str_split(variable, stringr::fixed(var_agg_delimiter)),
+             `%in%`,
+             pos_vars)
+    expected_neg <-
+      lapply(stringr::str_split(variable, stringr::fixed(var_agg_delimiter)),
+             `%in%`,
+             neg_vars)
 
-  dplyr::if_else(
-    unlist(lapply(expected_pos, all)), TRUE,
-    dplyr::if_else(
-      unlist(lapply(expected_pos, any)), NA,
-      dplyr::if_else(unlist(lapply(expected_neg, all)), FALSE, NA)
-    )
-  )
-}
+    dplyr::if_else(unlist(lapply(expected_pos, all)),
+                   TRUE,
+                   dplyr::if_else(unlist(lapply(expected_pos, any)), NA,
+                                  dplyr::if_else(unlist(
+                                    lapply(expected_neg, all)
+                                  ), FALSE, NA)))
+  }
 
 #' Flag P-Values Based on Predefined Thresholds
 #'
@@ -496,9 +626,11 @@ determine_expected_sign <- function(variable, pos_vars, neg_vars, var_agg_delimi
 #'
 determine_pvalue_flag <- function(type, pvalue, pvalue_thresholds) {
   dplyr::if_else(
-    type == "intercept", pvalue > pvalue_thresholds["intercept"],
+    type == "intercept",
+    pvalue > pvalue_thresholds["intercept"],
     dplyr::if_else(
-      type == "fixed", pvalue > pvalue_thresholds["fixed"],
+      type == "fixed",
+      pvalue > pvalue_thresholds["fixed"],
       pvalue > pvalue_thresholds["flexible"]
     )
   )
