@@ -36,9 +36,14 @@
 #' }
 #'
 compute_apl_values <- function(modeling_df, adstock, power, lag) {
-  stopifnot(adstock>=0 & power>=0 & adstock<=1 & power<=1)
-  transformed_df <- apply(stats::filter(modeling_df, adstock, method = "recursive")^power, 2, dplyr::lag, lag)
-  dimnames(transformed_df) <- list(row.names(modeling_df), names(modeling_df))
+  stopifnot(adstock >= 0 & power >= 0 & adstock <= 1 & power <= 1)
+  transformed_df <-
+    apply(stats::filter(modeling_df, adstock, method = "recursive") ^ power,
+          2,
+          dplyr::lag,
+          lag)
+  dimnames(transformed_df) <-
+    list(row.names(modeling_df), names(modeling_df))
   return(as.data.frame(transformed_df))
 }
 
@@ -75,26 +80,37 @@ compute_apl_values <- function(modeling_df, adstock, power, lag) {
 #'                          power = c(2, 3), lag = c(1, 2))
 #' }
 #'
-generate_apl_dataframe <- function(modeling_df, adstock, power, lag, apl_delimiter = "_", delimiter = "|") {
-  transformed_df_list <- purrr::map(adstock, function(adstock_) {
-    purrr::map(power, function(power_) {
-      purrr::map(lag, function(lag_) {
-        stats::setNames(
-          list(compute_apl_values(modeling_df, adstock_, power_, lag_)),
-          paste(adstock_, power_, lag_, sep = apl_delimiter)
-        )
+generate_apl_dataframe <-
+  function(modeling_df,
+           adstock,
+           power,
+           lag,
+           apl_delimiter = "_",
+           delimiter = "|") {
+    transformed_df_list <- purrr::map(adstock, function(adstock_) {
+      purrr::map(power, function(power_) {
+        purrr::map(lag, function(lag_) {
+          stats::setNames(
+            list(
+              compute_apl_values(modeling_df, adstock_, power_, lag_)
+            ),
+            paste(adstock_, power_, lag_, sep = apl_delimiter)
+          )
+        })
       })
     })
-  })
 
-  transformed_df_list <- unlist(unlist(transformed_df_list, recursive = FALSE), recursive = FALSE)
+    transformed_df_list <-
+      unlist(unlist(transformed_df_list, recursive = FALSE), recursive = FALSE)
 
-  transformed_df_list <- lapply(transformed_df_list, function(transformed_df) {
-    names(transformed_df[[1]]) <- paste(names(transformed_df[[1]]), names(transformed_df), sep = delimiter)
-    return(transformed_df)
-  })
-  return(dplyr::bind_cols(transformed_df_list))
-}
+    transformed_df_list <-
+      lapply(transformed_df_list, function(transformed_df) {
+        names(transformed_df[[1]]) <-
+          paste(names(transformed_df[[1]]), names(transformed_df), sep = delimiter)
+        return(transformed_df)
+      })
+    return(dplyr::bind_cols(transformed_df_list))
+  }
 
 #' Apply Adstock, Power, and Lag Transformation to Multiple Variables
 #'
@@ -135,16 +151,14 @@ generate_apl_dataframe <- function(modeling_df, adstock, power, lag, apl_delimit
 #' @export
 #'
 apply_apl <- function(modeling_df, candidate_variables) {
-  dplyr::bind_cols(
-    purrr::map(names(candidate_variables), function(x) {
-      compute_apl_values(
-        modeling_df[, x, drop = FALSE],
-        candidate_variables[[x]]["adstock"],
-        candidate_variables[[x]]["power"],
-        candidate_variables[[x]]["lag"]
-      )
-    })
-  )
+  dplyr::bind_cols(purrr::map(names(candidate_variables), function(x) {
+    compute_apl_values(
+      modeling_df[, x, drop = FALSE],
+      candidate_variables[[x]]["adstock"],
+      candidate_variables[[x]]["power"],
+      candidate_variables[[x]]["lag"]
+    )
+  }))
 }
 
 #' Generate Combinations of Adstock, Power, and Lag
@@ -190,24 +204,37 @@ apply_apl <- function(modeling_df, candidate_variables) {
 #'   print(apl_combinations)
 #' }
 #'
-generate_apl_combinations <- function(adstock_start_end_step, power_start_end_step, lag_start_end_step, apl_constraints = NA) {
-  # Extract relevant constraints
-  apl <- lapply(
-    c(adstock_start_end_step, power_start_end_step, lag_start_end_step),
-    function(x) seq(x["start"], x["end"], x["step"])
-  )
+generate_apl_combinations <-
+  function(adstock_start_end_step,
+           power_start_end_step,
+           lag_start_end_step,
+           apl_constraints = NA) {
+    # Extract relevant constraints
+    apl <- lapply(c(
+      adstock_start_end_step,
+      power_start_end_step,
+      lag_start_end_step
+    ),
+    function(x)
+      seq(x["start"], x["end"], x["step"]))
 
-  # Generate all combinations
-  combination <- expand.grid(adstock = apl$adstock, power = apl$power, lag = apl$lag)
+    # Generate all combinations
+    combination <-
+      expand.grid(
+        adstock = apl$adstock,
+        power = apl$power,
+        lag = apl$lag
+      )
 
-  # Apply additional constraints if specified
-  if (!is.na(apl_constraints)) {
-    combination <- subset(combination, eval(parse(text = apl_constraints$constraints)))
+    # Apply additional constraints if specified
+    if (!is.na(apl_constraints)) {
+      combination <-
+        subset(combination, eval(parse(text = apl_constraints$constraints)))
+    }
+
+    # Return the combinations as a list
+    return(unname(asplit(combination, 1)))
   }
-
-  # Return the combinations as a list
-  return(unname(asplit(combination, 1)))
-}
 
 #' Generate Variable Combinations with Adstock, Power, and Lag
 #'
@@ -255,19 +282,20 @@ generate_apl_combinations <- function(adstock_start_end_step, power_start_end_st
 #'
 #' @export
 #'
-generate_variable_combination <- function(variables_wt_apl_constraints) {
-  variables_apl_combination <- lapply(variables_wt_apl_constraints, function(x)
-    generate_apl_combinations(
-      x["adstock"],
-      x["power"],
-      x["lag"],
-      x["constraints"]
-    )
-  )
+generate_variable_combination <-
+  function(variables_wt_apl_constraints) {
+    variables_apl_combination <-
+      lapply(variables_wt_apl_constraints, function(x)
+        generate_apl_combinations(x["adstock"],
+                                  x["power"],
+                                  x["lag"],
+                                  x["constraints"]))
 
-  if (length(variables_apl_combination) == 1) {
-    variables_apl_combination <- list(variables_apl_combination)
+    if (length(variables_apl_combination) == 1) {
+      variables_apl_combination <- list(variables_apl_combination)
+    }
+
+    return(apply(do.call(
+      expand.grid, variables_apl_combination
+    ), 1, as.list))
   }
-
-  return(apply(do.call(expand.grid, variables_apl_combination), 1, as.list))
-}
