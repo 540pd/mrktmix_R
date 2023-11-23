@@ -84,28 +84,42 @@ summarize_model <- function(model_summary, loop_id) {
 #'   identify_drop_variable(coef_df, 2, TRUE, FALSE, 1)
 #' }
 #'
-identify_drop_variable <- function(coef_df, pvalue_precision, discard_sign, highest_estimate, run_up_to_flexi_vars) {
-  coef_df<-coef_df[coef_df$type != "fixed",c("type","variable","Pr(>|t|)","Estimate","flag_pvalue", "flag_sign", "flag_vif")]
-  coef_df$flag_sum = rowSums(coef_df[,c("flag_pvalue", "flag_sign", "flag_vif")], na.rm = TRUE) != 0
-  coef_df$"Pr(>|t|)"[coef_df$type=="intercept"] <- coef_df$"Pr(>|t|)"[coef_df$type=="intercept"] -1
-  coef_df$"Pr(>|t|)" <- round(coef_df$"Pr(>|t|)", pvalue_precision)
-  if (discard_sign) {
-    coef_df$Estimate<- abs(coef_df$Estimate)
-  }
-  if (highest_estimate){
-    coef_order<-with(coef_df,order(-flag_sum, -`Pr(>|t|)`, -Estimate))
-  } else {
-    coef_order<-with(coef_df,order(-flag_sum, -`Pr(>|t|)`, Estimate))
-  }
-  coef_df <- coef_df[coef_order,]
+identify_drop_variable <-
+  function(coef_df,
+           pvalue_precision,
+           discard_sign,
+           highest_estimate,
+           run_up_to_flexi_vars) {
+    coef_df <-
+      coef_df[coef_df$type != "fixed", c("type",
+                                         "variable",
+                                         "Pr(>|t|)",
+                                         "Estimate",
+                                         "flag_pvalue",
+                                         "flag_sign",
+                                         "flag_vif")]
+    coef_df$flag_sum = rowSums(coef_df[, c("flag_pvalue", "flag_sign", "flag_vif")], na.rm = TRUE) != 0
+    coef_df$"Pr(>|t|)"[coef_df$type == "intercept"] <-
+      coef_df$"Pr(>|t|)"[coef_df$type == "intercept"] - 1
+    coef_df$"Pr(>|t|)" <- round(coef_df$"Pr(>|t|)", pvalue_precision)
+    if (discard_sign) {
+      coef_df$Estimate <- abs(coef_df$Estimate)
+    }
+    if (highest_estimate) {
+      coef_order <- with(coef_df, order(-flag_sum,-`Pr(>|t|)`,-Estimate))
+    } else {
+      coef_order <- with(coef_df, order(-flag_sum,-`Pr(>|t|)`, Estimate))
+    }
+    coef_df <- coef_df[coef_order, ]
 
-  if(sum(coef_df$flag_sum,na.rm=T) || (nrow(coef_df) > run_up_to_flexi_vars)){
-    drop_var<-coef_df$variable[1]
-  } else {
-    drop_var<-NA
+    if (sum(coef_df$flag_sum, na.rm = T) ||
+        (nrow(coef_df) > run_up_to_flexi_vars)) {
+      drop_var <- coef_df$variable[1]
+    } else {
+      drop_var <- NA
+    }
+    drop_var
   }
-  drop_var
-}
 
 #' Update Linear Model by Dropping a Variable
 #'
@@ -140,7 +154,11 @@ identify_drop_variable <- function(coef_df, pvalue_precision, discard_sign, high
 #' }
 #'
 update_model <- function(model, model_data, variable_to_drop) {
-  formula_update <- if (variable_to_drop == "(Intercept)") ". ~ . - 1" else paste(". ~ . -", variable_to_drop)
+  formula_update <-
+    if (variable_to_drop == "(Intercept)")
+      ". ~ . - 1"
+  else
+    paste(". ~ . -", variable_to_drop)
   stats::update(model, formula(formula_update), data = model_data)
 }
 
@@ -177,36 +195,50 @@ update_model <- function(model, model_data, variable_to_drop) {
 #'    names(event), round_digits = 2, verbose = TRUE)
 #' }
 #'
-cleanse_model_singularity <- function(lm_model, model_data, flexible_variables, round_digits = 2, verbose = FALSE) {
-  model_vars <- names(stats::coef(lm_model))
+cleanse_model_singularity <-
+  function(lm_model,
+           model_data,
+           flexible_variables,
+           round_digits = 2,
+           verbose = FALSE) {
+    model_vars <- names(stats::coef(lm_model))
 
-  # Filter flexible variables present in the model
-  flexible_variables <- flexible_variables[flexible_variables %in% model_vars]
+    # Filter flexible variables present in the model
+    flexible_variables <-
+      flexible_variables[flexible_variables %in% model_vars]
 
-  repeat {
-    aliased_info <- summary(lm_model)$aliased
-    singular_vars <- names(aliased_info)[aliased_info]
-    singular_vars <- intersect(singular_vars, flexible_variables)
+    repeat {
+      aliased_info <- summary(lm_model)$aliased
+      singular_vars <- names(aliased_info)[aliased_info]
+      singular_vars <- intersect(singular_vars, flexible_variables)
 
-    # Break if no singular variables
-    if (length(singular_vars) == 0) break
+      # Break if no singular variables
+      if (length(singular_vars) == 0)
+        break
 
-    # Calculate linear dependency
-    linear_dependency <- apply(stats::alias(lm_model)[[2]], 1, function(x) sum(abs(x[round(abs(x), 1) == 1])))
-    singular_vars_dependency <- linear_dependency[names(linear_dependency) %in% singular_vars]
-    drop_var <- names(sort(singular_vars_dependency, decreasing = TRUE))[1]
+      # Calculate linear dependency
+      linear_dependency <-
+        apply(stats::alias(lm_model)[[2]], 1, function(x)
+          sum(abs(x[round(abs(x), 1) == 1])))
+      singular_vars_dependency <-
+        linear_dependency[names(linear_dependency) %in% singular_vars]
+      drop_var <-
+        names(sort(singular_vars_dependency, decreasing = TRUE))[1]
 
-    # Verbose output
-    if (verbose) {
-      message("Dropping variable due to singularity: ", drop_var)
+      # Verbose output
+      if (verbose) {
+        message("Dropping variable due to singularity: ", drop_var)
+      }
+
+      # Update model by removing the most dependent variable
+      lm_model <-
+        stats::update(lm_model,
+                      formula = stats::as.formula(paste(". ~ . -", drop_var)),
+                      data = model_data)
     }
 
-    # Update model by removing the most dependent variable
-    lm_model <- stats::update(lm_model, formula = stats::as.formula(paste(". ~ . -", drop_var)), data = model_data)
+    lm_model
   }
-
-  lm_model
-}
 
 #' Cleanse Model Perfect Fit
 #'
@@ -244,35 +276,39 @@ cleanse_model_singularity <- function(lm_model, model_data, flexible_variables, 
 #'     ignore_estimate_sign = TRUE)
 #' }
 #'
-cleanse_model_perfect_fit <- function(lm_model, model_data, flexible_variables,
-                                      drop_highest_estimate = TRUE,
-                                      ignore_estimate_sign = TRUE) {
-  model_summary <- summary(lm_model)
+cleanse_model_perfect_fit <-
+  function(lm_model,
+           model_data,
+           flexible_variables,
+           drop_highest_estimate = TRUE,
+           ignore_estimate_sign = TRUE) {
+    model_summary <- summary(lm_model)
 
-  # Check for no residual degree of freedom
-  if (model_summary$df[2] != 0) {
-    return(lm_model)
+    # Check for no residual degree of freedom
+    if (model_summary$df[2] != 0) {
+      return(lm_model)
+    }
+
+    # Extract and optionally modify estimates for flexible variables
+    model_estimate <- stats::coef(lm_model)[flexible_variables]
+    if (ignore_estimate_sign) {
+      model_estimate <- abs(model_estimate)
+    }
+
+    # Determine variable to drop based on estimates
+    drop_var <- if (drop_highest_estimate) {
+      names(which.min(model_estimate))
+    } else {
+      names(which.max(model_estimate))
+    }
+
+    # Update the model formula by removing the identified variable
+    lm_model <- stats::update(lm_model,
+                              formula = stats::as.formula(paste(". ~ . -", drop_var)),
+                              data = model_data)
+
+    lm_model
   }
-
-  # Extract and optionally modify estimates for flexible variables
-  model_estimate <- stats::coef(lm_model)[flexible_variables]
-  if (ignore_estimate_sign) {
-    model_estimate <- abs(model_estimate)
-  }
-
-  # Determine variable to drop based on estimates
-  drop_var <- if (drop_highest_estimate) {
-    names(which.min(model_estimate))
-  } else {
-    names(which.max(model_estimate))
-  }
-
-  # Update the model formula by removing the identified variable
-  lm_model <- stats::update(lm_model,
-                            formula = stats::as.formula(paste(". ~ . -", drop_var)), data = model_data)
-
-  lm_model
-}
 
 #' Calculate Variance Inflation Factor (VIF)
 #'
@@ -317,8 +353,14 @@ calculate_vif <- function(model) {
     suppressWarnings(car::vif(model))
   }, error = function(e) {
     # Return Inf if error (typically due to multicollinearity)
-    warning("An error occurred in calculating VIF. Returning Inf for all coefficients. Error: ", e$message)
-    rep(Inf, length(coef_model) - if (has_intercept) 1 else 0)
+    warning(
+      "An error occurred in calculating VIF. Returning Inf for all coefficients. Error: ",
+      e$message
+    )
+    rep(Inf, length(coef_model) - if (has_intercept)
+      1
+      else
+        0)
   })
 
   # Add intercept with NA if model has an intercept, otherwise use VIF values directly
@@ -383,83 +425,116 @@ calculate_vif <- function(model) {
 #' @importFrom tibble rownames_to_column
 #' @importFrom rlang .data
 #'
-get_base_model <- function(lm_model, model_data, independent_var_info,
-                           drop_flexi_vars=TRUE, run_up_to_flexi_vars = 10,
-                           drop_pvalue_precision = 2, discard_estimate_sign = TRUE,
-                           drop_highest_estimate = FALSE, get_model_object = FALSE,
-                           always_check_vif = FALSE) {
-  # Cleanse model for singularity and perfect fit
-  lm_model <- cleanse_model_singularity(
-    lm_model, model_data,
-    independent_var_info$variable[independent_var_info$type == "flexible"],
-    round_digits = 2
-  )
-  lm_model <- cleanse_model_perfect_fit(
-    lm_model, model_data,
-    independent_var_info$variable[independent_var_info$type == "flexible"],
-    drop_highest_estimate = FALSE,
-    ignore_estimate_sign = TRUE
-  )
-
-  # Initialize loop and data frames to store results
-  loop_id <- 1
-  model_coef_all <- tibble::tibble()
-  model_smry_all <- tibble::tibble()
-
-  # Begin variable dropping loop
-  repeat {
-    # Get summary of the current model
-    lm_model_smry <- summary(lm_model)
-    model_coef<-as.data.frame(lm_model_smry$coefficients)
-    model_coef$variable<-gsub("`", "", rownames(model_coef))
-    model_coef<-merge(model_coef,independent_var_info, by ="variable", all.x=T, sort = F)
-    model_coef$loop_id <- loop_id
-    model_coef$flag_pvalue <- model_coef$`Pr(>|t|)`> model_coef$critical_pvalue
-    model_coef$flag_sign <- (model_coef$Estimate > 0) != model_coef$expected_sign
-    if(always_check_vif || !any(c(model_coef$flag_pvalue,model_coef$flag_sign),na.rm=T)){
-      model_coef$vif <- calculate_vif(lm_model)
-    } else {
-      model_coef$vif <- NA
-    }
-    model_coef$flag_vif = model_coef$vif > model_coef$critical_vif
-    model_coef<-model_coef[,c("loop_id", "variable", "type", "adstock", "power", "lag", "sum", "Estimate",
-                  "Std. Error", "t value", "Pr(>|t|)", "vif", "flag_pvalue", "flag_sign", "flag_vif")]
-
-
-    # Accumulate results
-    model_coef_all <- dplyr::bind_rows(model_coef_all, model_coef)
-    model_smry_all <- dplyr::bind_rows(model_smry_all, summarize_model(lm_model_smry, loop_id))
-
-    # Break loop if no variable is identified to drop
-    if (!drop_flexi_vars) {
-      break
-    }
-
-    # Identify variable to drop based on the current model
-    variable_to_drop <- identify_drop_variable(
-      model_coef,
-      drop_pvalue_precision,
-      discard_estimate_sign,
-      drop_highest_estimate,
-      run_up_to_flexi_vars
+get_base_model <-
+  function(lm_model,
+           model_data,
+           independent_var_info,
+           drop_flexi_vars = TRUE,
+           run_up_to_flexi_vars = 10,
+           drop_pvalue_precision = 2,
+           discard_estimate_sign = TRUE,
+           drop_highest_estimate = FALSE,
+           get_model_object = FALSE,
+           always_check_vif = FALSE) {
+    # Cleanse model for singularity and perfect fit
+    lm_model <- cleanse_model_singularity(lm_model,
+                                          model_data,
+                                          independent_var_info$variable[independent_var_info$type == "flexible"],
+                                          round_digits = 2)
+    lm_model <- cleanse_model_perfect_fit(
+      lm_model,
+      model_data,
+      independent_var_info$variable[independent_var_info$type == "flexible"],
+      drop_highest_estimate = FALSE,
+      ignore_estimate_sign = TRUE
     )
 
-    # Break loop if no variable is identified to drop
-    if (is.na(variable_to_drop) || !length(variable_to_drop)) {
-      break
+    # Initialize loop and data frames to store results
+    loop_id <- 1
+    model_coef_all <- tibble::tibble()
+    model_smry_all <- tibble::tibble()
+
+    # Begin variable dropping loop
+    repeat {
+      # Get summary of the current model
+      lm_model_smry <- summary(lm_model)
+      model_coef <- as.data.frame(lm_model_smry$coefficients)
+      model_coef$variable <- gsub("`", "", rownames(model_coef))
+      model_coef <-
+        merge(
+          model_coef,
+          independent_var_info,
+          by = "variable",
+          all.x = T,
+          sort = F
+        )
+      model_coef$loop_id <- loop_id
+      model_coef$flag_pvalue <-
+        model_coef$`Pr(>|t|)` > model_coef$critical_pvalue
+      model_coef$flag_sign <-
+        (model_coef$Estimate > 0) != model_coef$expected_sign
+      if (always_check_vif ||
+          !any(c(model_coef$flag_pvalue, model_coef$flag_sign), na.rm = T)) {
+        model_coef$vif <- calculate_vif(lm_model)
+      } else {
+        model_coef$vif <- NA
+      }
+      model_coef$flag_vif = model_coef$vif > model_coef$critical_vif
+      model_coef <-
+        model_coef[, c(
+          "loop_id",
+          "variable",
+          "type",
+          "adstock",
+          "power",
+          "lag",
+          "sum",
+          "Estimate",
+          "Std. Error",
+          "t value",
+          "Pr(>|t|)",
+          "vif",
+          "flag_pvalue",
+          "flag_sign",
+          "flag_vif"
+        )]
+
+
+      # Accumulate results
+      model_coef_all <- dplyr::bind_rows(model_coef_all, model_coef)
+      model_smry_all <-
+        dplyr::bind_rows(model_smry_all, summarize_model(lm_model_smry, loop_id))
+
+      # Break loop if no variable is identified to drop
+      if (!drop_flexi_vars) {
+        break
+      }
+
+      # Identify variable to drop based on the current model
+      variable_to_drop <- identify_drop_variable(
+        model_coef,
+        drop_pvalue_precision,
+        discard_estimate_sign,
+        drop_highest_estimate,
+        run_up_to_flexi_vars
+      )
+
+      # Break loop if no variable is identified to drop
+      if (is.na(variable_to_drop) || !length(variable_to_drop)) {
+        break
+      }
+
+      # Update loop counter and model
+      loop_id <- loop_id + 1
+      lm_model <- update_model(lm_model, model_data, variable_to_drop)
     }
 
-    # Update loop counter and model
-    loop_id <- loop_id + 1
-    lm_model <- update_model(lm_model, model_data, variable_to_drop)
-  }
+    # Return results
+    if (get_model_object) {
+      coef_smry_lm <- list(model_coef_all, model_smry_all, lm_model)
+    } else {
+      coef_smry_lm <- list(model_coef_all, model_smry_all, NA)
+    }
 
-  # Return results
-  if (get_model_object) {
-    coef_smry_lm <- list(model_coef_all, model_smry_all, lm_model)
-  } else {
-    coef_smry_lm <- list(model_coef_all, model_smry_all, NA)
+    return(coef_smry_lm)
   }
-
-  return(coef_smry_lm)
-}
