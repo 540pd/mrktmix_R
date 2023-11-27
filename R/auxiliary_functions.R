@@ -169,7 +169,6 @@ replace_values_pairwise <-
 #' current_var_apl <- c("var1|A_0.2_2_0.5" = 0.6, "var3|B_0.4_1_0.2" = 0.2)
 #' scope_for_dependent_variable(previous_var_apl, current_var_apl)
 #' }
-#' @export
 scope_for_dependent_variable <-
   function(previous_var_apl,
            current_var_apl,
@@ -221,3 +220,27 @@ scope_for_dependent_variable <-
     return(c(current_var_apl[current_var_wo_apl %in% feasible_dependent_variables],
              previous_var_apl[previous_var_wo_apl %in% feasible_dependent_variables[!feasible_dependent_variables %in% current_var_wo_apl]]))
   }
+
+#' Create File Path
+#'
+#' Create a file path based on the specified folder, file name, and relative directory.
+#'
+#' @param folder The folder in which the file is located.
+#' @param file_name The name of the file.
+#' @param relative_directory The relative directory path (default is ".").
+#' @return A character vector representing the absolute file path.
+#' @examples
+#' \dontrun{
+#' create_file_path("data", "example.csv")
+#' create_file_path("output", "result.txt", relative_directory = "project")
+#' }
+create_file_path <- function(folder, file_name, relative_directory = ".") {
+  # Check if the suffix indicates a CSV file
+  path.expand(
+    file.path(
+      normalizePath(relative_directory),
+      folder,
+      file_name
+    )
+  )
+}
