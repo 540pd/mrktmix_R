@@ -280,7 +280,6 @@ generate_apl_combinations <-
 #'   print(variable_combinations)
 #' }
 #'
-#' @export
 #'
 generate_variable_combination <-
   function(variables_wt_apl_constraints) {
