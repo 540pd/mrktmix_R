@@ -84,7 +84,6 @@ assemble_base_models <-
     model_df_apl <-
       apply_apl(model_indep_df, unlist(unname(candidate_predictors), recursive = F))
     model_df_apl[is.na(model_df_apl)] <- 0
-
     independent_variable_info <- merge(
       candidate_predictors_info,
       data.frame(sum = c(
@@ -98,7 +97,7 @@ assemble_base_models <-
 
     # Combine dependent and independent data
     modeling_df <-
-      dplyr::bind_cols(model_dep_df, model_df_apl[rownames(model_df_apl) %in% rownames(model_dep_df), ])
+      dplyr::bind_cols(model_dep_df, model_df_apl[rownames(model_df_apl) %in% rownames(model_dep_df),])
 
     # Fit linear model
     lm_model_formula <-
@@ -211,6 +210,7 @@ collate_base_models <-
       base_data <- NA
       model_dep_df_modified <- model_dep_df
     }
+    candidate_variables_list[[1]]
 
     candidate_variables_df <-
       purrr::map_dfr(candidate_variables_list, function(candidate_variables_l) {
@@ -227,9 +227,11 @@ collate_base_models <-
           })
         dplyr::bind_rows(apl_df_wt_names)
       }, .id = "model_id")
+    candidate_variables_df$model_id <-
+      as.numeric(candidate_variables_df$model_id)
 
     if (with_intercept) {
-      intercetp_df <-
+      intercept_df <-
         data.frame(
           variable = "(Intercept)",
           adstock = NA,
@@ -238,11 +240,11 @@ collate_base_models <-
           type = "intercept",
           row.names = "(Intercept)"
         )
-      intercetp_df <-
-        intercetp_df[rep(1, length(candidate_variables_list)),]
-      intercetp_df$model_id <- 1:nrow(intercetp_df)
+      intercept_df <-
+        intercept_df[rep(1, length(candidate_variables_list)), ]
+      intercept_df$model_id <- 1:nrow(intercept_df)
       candidate_variables_df <-
-        rbind(candidate_variables_df, intercetp_df)
+        rbind(candidate_variables_df, intercept_df)
     }
 
     expected_sign <-
@@ -539,7 +541,7 @@ collate_models <-
         values_to = "value"
       ) %>%
       dplyr::mutate(variable = paste(.data[["type"]], .data[["variable_name"]], sep = "_")) %>%
-      dplyr::select(-"type",-"variable_name")
+      dplyr::select(-"type", -"variable_name")
 
     # Pivot wider and prepare for join
     mdl_smry_var_type <- smry_var_type %>%
@@ -568,7 +570,7 @@ collate_models <-
         values_to = "value"
       ) %>%
       dplyr::mutate(variable_new = paste(.data$variable, .data$variable_name, sep = "_")) %>%
-      dplyr::select(-"variable",-"variable_name")
+      dplyr::select(-"variable", -"variable_name")
 
     # Pivot wider and prepare for join
     mdl_smry_var_wide <- mdl_smry_var %>%
