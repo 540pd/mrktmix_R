@@ -78,12 +78,12 @@ split_and_convert_to_numeric <- function(char_vector, delimiter) {
 #' Note that each element in the output list is a direct copy of `predefined_pairs`,
 #' and not a list of individual key-value pairs.
 #'
-#' @param var_names A named vector of variable names.
+#' @param var_names A character vector of variable names.
 #' @param predefined_pairs A list of predefined key-value pairs to be replicated.
 #' @return A named list where each element is a copy of the predefined pairs list.
 #' @examples
 #' \dontrun{
-#' var_names <- c("var1" = "Variable 1", "var2" = "Variable 2")
+#' var_names <- c("var1", "var2")
 #' predefined_pairs <- list(setNames(1:3, c("adstock", "power", "lag")))
 #' create_named_lists_from_vars(var_names, predefined_pairs)
 #' }
@@ -99,7 +99,7 @@ create_named_lists_from_vars <-
 
     named_lists <-
       replicate(length(var_names), predefined_pairs, simplify = TRUE)
-    setNames(named_lists, names(var_names))
+    setNames(named_lists, var_names)
   }
 
 #' Replace Values Pairwise
