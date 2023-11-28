@@ -222,6 +222,30 @@ scope_for_dependent_variable <-
              previous_var_apl[previous_var_wo_apl %in% feasible_dependent_variables[!feasible_dependent_variables %in% current_var_wo_apl]]))
   }
 
+#' Create File Path
+#'
+#' Create a file path based on the specified folder, file name, and relative directory.
+#'
+#' @param folder The folder in which the file is located.
+#' @param file_name The name of the file.
+#' @param relative_directory The relative directory path (default is ".").
+#' @return A character vector representing the absolute file path.
+#' @examples
+#' \dontrun{
+#' create_file_path("data", "example.csv")
+#' create_file_path("output", "result.txt", relative_directory = "project")
+#' }
+create_file_path <- function(folder, file_name, relative_directory = ".") {
+  # Check if the suffix indicates a CSV file
+  path.expand(
+    file.path(
+      normalizePath(relative_directory),
+      folder,
+      file_name
+    )
+  )
+}
+
 #' Slowly Changing Dimension Type 2 Update Function
 #'
 #' This function updates a base dataset with changes from a current dataset using the
