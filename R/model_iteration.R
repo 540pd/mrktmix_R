@@ -195,6 +195,7 @@ collate_base_models <-
            drop_highest_estimate = FALSE,
            get_model_object = FALSE,
            always_check_vif = FALSE) {
+
     # Ensure proper data types and structures
     stopifnot(is.list(candidate_variables_list))
     stopifnot(is.data.frame(model_df))
@@ -248,12 +249,12 @@ collate_base_models <-
     }
 
     expected_sign <-
-      determine_expected_sign(names(model_df),
+      determine_expected_sign(c(names(model_df),"(Intercept)"),
                               pos_sign_variables,
                               neg_sign_variables,
                               var_agg_delimiter)
     expected_sign_df <-
-      data.frame(variable = names(model_df), expected_sign = expected_sign)
+      data.frame(variable = c(names(model_df),"(Intercept)"), expected_sign = expected_sign)
     candidate_variables_df <-
       merge(candidate_variables_df,
             expected_sign_df,
