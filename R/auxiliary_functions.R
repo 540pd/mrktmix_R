@@ -169,6 +169,7 @@ replace_values_pairwise <-
 #' current_var_apl <- c("var1|A_0.2_2_0.5" = 0.6, "var3|B_0.4_1_0.2" = 0.2)
 #' scope_for_dependent_variable(previous_var_apl, current_var_apl)
 #' }
+#' @export
 scope_for_dependent_variable <-
   function(previous_var_apl,
            current_var_apl,
@@ -221,26 +222,91 @@ scope_for_dependent_variable <-
              previous_var_apl[previous_var_wo_apl %in% feasible_dependent_variables[!feasible_dependent_variables %in% current_var_wo_apl]]))
   }
 
-#' Create File Path
+#' Slowly Changing Dimension Type 2 Update Function
 #'
-#' Create a file path based on the specified folder, file name, and relative directory.
+#' This function updates a base dataset with changes from a current dataset using the
+#' Slowly Changing Dimension Type 2 (SCD2) methodology. It handles additions of new
+#' records and updates to existing records based on specified identification columns
+#' and comparison columns. It assumes that the base data should not contain records
+#' ending with '_base', and new data should not contain 'start_date' and 'end_date'.
+#' Additionally, it only compares numeric values in `compare_cols` and excludes any
+#' columns starting with 'source_' in `current_data`.
 #'
-#' @param folder The folder in which the file is located.
-#' @param file_name The name of the file.
-#' @param relative_directory The relative directory path (default is ".").
-#' @return A character vector representing the absolute file path.
+#' @param base_data A dataframe representing the base data to be updated.
+#' @param current_data A dataframe representing the current data with potential updates.
+#' @param id_cols A vector of column names used for identifying records.
+#' @param compare_cols A vector of column names used for comparing record values.
+#' @param create_date The name of the column representing creation date in the base data.
+#' @param update_date The name of the column representing update date in the base data.
+#' @return A dataframe that is the result of applying SCD2 methodology on the base data
+#'         with the updates from the current data.
+#' @importFrom dplyr full_join group_by mutate filter
+#' @importFrom purrr map
 #' @examples
 #' \dontrun{
-#' create_file_path("data", "example.csv")
-#' create_file_path("output", "result.txt", relative_directory = "project")
+#' base_data <- data.frame(
+#'   model_id = c(1, 1, 2, 3),
+#'   version_id = c(1, 2, 3, 4),
+#'   name = c("Alice", "Bob", "Charlie", "David"),
+#'   value = c(100, 200, 300, 400),
+#'   start_date = as.POSIXct(c("2023-01-01", "2023-01-05", "2023-01-05", "2023-01-05")),
+#'   end_date = as.POSIXct(NA)
+#' )
+#' id_cols <- c("model_id", "version_id")
+#' compare_cols <- "value"
+#' scd_type_2_update(base_data, data.frame(), id_cols, compare_cols)
 #' }
-create_file_path <- function(folder, file_name, relative_directory = ".") {
-  # Check if the suffix indicates a CSV file
-  path.expand(
-    file.path(
-      normalizePath(relative_directory),
-      folder,
-      file_name
-    )
-  )
-}
+#'
+scd_type_2_update <-
+  function(base_data,
+           current_data,
+           id_cols,
+           compare_cols,
+           create_date = "start_date",
+           update_date = "end_date") {
+    # Initialize start_date and end_date in base_data if not present
+    if (!create_date %in% names(base_data)) {
+      base_data[[create_date]] <- Sys.time()
+    }
+    if (!update_date %in% names(base_data)) {
+      base_data[[update_date]] <- as.POSIXct(NA)
+    }
+
+    if(nrow(current_data)!=0){
+      current_data[[create_date]] <- Sys.time()
+      current_data[[update_date]] <- as.POSIXct(NA)
+      current_data[["source_current"]] = TRUE
+
+      current_base_data <- current_data %>%
+        full_join(
+          base_data %>% filter(is.na(get(update_date)))  %>% mutate(source_base = TRUE),
+          by = id_cols,
+          suffix = c("", "_base")
+        )
+
+      # data present in current but not in base, new data
+      new_data_added<-current_base_data[is.na(current_base_data$source_base) & !is.na(current_base_data$source_current),names(current_data)]
+
+      # common ids data
+      common_data<-current_base_data[!is.na(current_base_data$source_base) & !is.na(current_base_data$source_current),]
+      common_data$is_difference <- rowSums(abs(common_data[,compare_cols, drop = F] - common_data[,paste(compare_cols,"base",sep="_"), drop= F])!=0)
+      common_data <- common_data %>%
+        group_by(across(tidyselect::all_of(id_cols))) %>%
+        mutate(id_cols_diff = sum(.data$is_difference))
+      common_data[common_data$id_cols_diff!=0,paste0(update_date,"_base")]<-common_data[common_data$id_cols_diff!=0,create_date]
+
+      old_data_updated<-rbind(
+        current_base_data[!is.na(current_base_data$source_base) & is.na(current_base_data$source_current),c(id_cols,names(current_base_data)[names(current_base_data)  %in%   paste(names(base_data),"base",sep = "_")])],
+        common_data[,c(id_cols,names(current_base_data)[names(current_base_data)  %in%   paste(names(base_data),"base",sep = "_")])])
+      names(old_data_updated)<-c(id_cols,sub("_base","",names(old_data_updated)[!names(old_data_updated) %in% id_cols]))
+
+      new_data_added<- rbind(common_data[common_data$id_cols_diff!=0,names(current_data)],
+                             current_base_data[is.na(current_base_data$source_base) & !is.na(current_base_data$source_current),names(current_data)])
+
+      rbind(old_data_updated, new_data_added[, !names(new_data_added) %in% "source_current"])
+    }
+    else {
+      base_data
+    }
+  }
+
