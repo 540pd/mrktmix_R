@@ -61,24 +61,6 @@ collate_base_models <-
            drop_flexi_vars,
            run_up_to_flexi_vars,
            drop_pvalue_precision,
-           discard_estimate_sign,
-           drop_highest_estimate,
-           get_model_object,
-           always_check_vif) {
-    # Function implementation remains unchanged
-  }
-
-
-collate_base_models <-
-  function(model_dep_df,
-           model_apl_list,
-           with_intercept,
-           base_data,
-           independent_variable_info_list,
-           dependent_sum,
-           drop_flexi_vars,
-           run_up_to_flexi_vars,
-           drop_pvalue_precision,
            discard_estimate_sign ,
            drop_highest_estimate ,
            get_model_object,
@@ -111,9 +93,7 @@ collate_base_models <-
         )
 
       },
-      .progress = T
-
-      )
+      .progress = T)
 
 
     model_coef_all <-
@@ -352,7 +332,7 @@ collate_models <-
           row.names = "(Intercept)"
         )
       intercept_df <-
-        intercept_df[rep(1, length(candidate_variables_list)), ]
+        intercept_df[rep(1, length(candidate_variables_list)),]
       intercept_df$model_id <- 1:nrow(intercept_df)
       candidate_variables_df <-
         rbind(candidate_variables_df, intercept_df)
@@ -514,7 +494,7 @@ collate_models <-
         values_to = "value"
       ) %>%
       dplyr::mutate(variable = paste(.data[["type"]], .data[["variable_name"]], sep = "_")) %>%
-      dplyr::select(-"type", -"variable_name")
+      dplyr::select(-"type",-"variable_name")
 
     # Pivot wider and prepare for join
     mdl_smry_var_type <- smry_var_type %>%
@@ -543,7 +523,7 @@ collate_models <-
         values_to = "value"
       ) %>%
       dplyr::mutate(variable_new = paste(.data$variable, .data$variable_name, sep = "_")) %>%
-      dplyr::select(-"variable", -"variable_name")
+      dplyr::select(-"variable",-"variable_name")
 
     # Pivot wider and prepare for join
     mdl_smry_var_wide <- mdl_smry_var %>%
