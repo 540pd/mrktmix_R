@@ -87,7 +87,7 @@ collate_base_models <-
       purrr::map2(model_apl_list, independent_variable_info_list, function(model_df_apl,
                                                                            independent_variable_info) {
         modeling_df <-
-          dplyr::bind_cols(model_dep_df, model_df_apl)
+          cbind(model_dep_df, model_df_apl)
 
         # Fit linear model
         lm_model_formula <-
@@ -110,7 +110,10 @@ collate_base_models <-
           always_check_vif
         )
 
-      }, .progress = TRUE)
+      },
+      .progress = T
+
+      )
 
 
     model_coef_all <-
@@ -357,13 +360,13 @@ collate_models <-
 
     expected_sign <-
       determine_expected_sign(
-        c(names(model_df), "(Intercept)"),
+        c(names(model_df_rel), "(Intercept)"),
         pos_sign_variables,
         neg_sign_variables,
         var_agg_delimiter
       )
     expected_sign_df <-
-      data.frame(variable = c(names(model_df), "(Intercept)"),
+      data.frame(variable = c(names(model_df_rel), "(Intercept)"),
                  expected_sign = expected_sign)
     candidate_variables_df <-
       merge(candidate_variables_df,
