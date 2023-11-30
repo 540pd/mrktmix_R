@@ -258,33 +258,43 @@ create_file_path <- function(folder, file_name, relative_directory = ".") {
 #'
 #' @param base_data A dataframe representing the base data to be updated.
 #' @param current_data A dataframe representing the current data with potential updates.
-#' @param id_cols A vector of column names used for identifying records.
+#' @param changes_ids A vector of column names at which base data will always be obsolete.
+#' This is a higher hierarchy of data in which changes are traced and old data will be obsolete.
+#' @param row_ids A vector of column names with primary keys.
 #' @param compare_cols A vector of column names used for comparing record values.
 #' @param create_date The name of the column representing creation date in the base data.
 #' @param update_date The name of the column representing update date in the base data.
 #' @return A dataframe that is the result of applying SCD2 methodology on the base data
 #'         with the updates from the current data.
-#' @importFrom dplyr full_join group_by mutate filter
+#' @importFrom dplyr full_join group_by mutate filter left_join
 #' @importFrom purrr map
 #' @examples
 #' \dontrun{
-#' base_data <- data.frame(
-#'   model_id = c(1, 1, 2, 3),
-#'   version_id = c(1, 2, 3, 4),
-#'   name = c("Alice", "Bob", "Charlie", "David"),
-#'   value = c(100, 200, 300, 400),
-#'   start_date = as.POSIXct(c("2023-01-01", "2023-01-05", "2023-01-05", "2023-01-05")),
-#'   end_date = as.POSIXct(NA)
-#' )
-#' id_cols <- c("model_id", "version_id")
-#' compare_cols <- "value"
-#' scd_type_2_update(base_data, data.frame(), id_cols, compare_cols)
+#'   base_data <- data.frame(
+#'     model_id = c(1, 1, 2, 3),
+#'     version_id = c(1, 2, 3, 4),
+#'     name = c("Alice", "Bob", "Charlie", "David"),
+#'     value = c(100, 200, 300, 400),
+#'     start_date = as.POSIXct(c("2023-01-01", "2023-01-05", "2023-01-05", "2023-01-05")),
+#'     end_date = as.POSIXct(NA)
+#'   )
+#'   current_data <- data.frame(
+#'     model_id = c(1),
+#'     version_id = c(2),
+#'     name = c("Alice"),
+#'     value = c(300)
+#'   )
+#'   changes_ids <- c("model_id")
+#'   row_ids <- c("model_id", "version_id")
+#'   compare_cols <- "value"
+#'   scd_type_2_update(base_data, current_data, changes_ids, row_ids, compare_cols)
 #' }
 #'
 scd_type_2_update <-
   function(base_data,
            current_data,
-           id_cols,
+           changes_ids,
+           row_ids,
            compare_cols,
            create_date = "start_date",
            update_date = "end_date") {
@@ -304,27 +314,34 @@ scd_type_2_update <-
       current_base_data <- current_data %>%
         full_join(
           base_data %>% filter(is.na(get(update_date)))  %>% mutate(source_base = TRUE),
-          by = id_cols,
+          by = row_ids,
           suffix = c("", "_base")
         )
 
-      # data present in current but not in base, new data
+      # data present in current but not in base - new data
       new_data_added<-current_base_data[is.na(current_base_data$source_base) & !is.na(current_base_data$source_current),names(current_data)]
 
       # common ids data
       common_data<-current_base_data[!is.na(current_base_data$source_base) & !is.na(current_base_data$source_current),]
       common_data$is_difference <- rowSums(abs(common_data[,compare_cols, drop = F] - common_data[,paste(compare_cols,"base",sep="_"), drop= F])!=0)
       common_data <- common_data %>%
-        group_by(across(tidyselect::all_of(id_cols))) %>%
-        mutate(id_cols_diff = sum(.data$is_difference))
-      common_data[common_data$id_cols_diff!=0,paste0(update_date,"_base")]<-common_data[common_data$id_cols_diff!=0,create_date]
+        group_by(across(tidyselect::all_of(row_ids))) %>%
+        mutate(row_ids_diff = sum(.data$is_difference))
+      common_data[common_data$row_ids_diff!=0,paste0(update_date,"_base")]<-common_data[common_data$row_ids_diff!=0,create_date]
+
+      # udpate any previous change in changes ids
+      current_old_data<-current_base_data[!is.na(current_base_data$source_base) & is.na(current_base_data$source_current),c(row_ids,names(current_base_data)[names(current_base_data)  %in%   paste(names(base_data),"base",sep = "_")])]
+      current_old_data<-current_old_data %>%
+        dplyr::left_join(unique(common_data[,c(changes_ids,create_date)]), by = changes_ids)
+      current_old_data[,paste0(update_date,"_base")]<-current_old_data[,create_date]
+      current_old_data<-current_old_data[,names(current_old_data) != create_date]
 
       old_data_updated<-rbind(
-        current_base_data[!is.na(current_base_data$source_base) & is.na(current_base_data$source_current),c(id_cols,names(current_base_data)[names(current_base_data)  %in%   paste(names(base_data),"base",sep = "_")])],
-        common_data[,c(id_cols,names(current_base_data)[names(current_base_data)  %in%   paste(names(base_data),"base",sep = "_")])])
-      names(old_data_updated)<-c(id_cols,sub("_base","",names(old_data_updated)[!names(old_data_updated) %in% id_cols]))
+        current_old_data,
+        common_data[,c(row_ids,names(current_base_data)[names(current_base_data)  %in%   paste(names(base_data),"base",sep = "_")])])
+      names(old_data_updated)<-c(row_ids,sub("_base","",names(old_data_updated)[!names(old_data_updated) %in% row_ids]))
 
-      new_data_added<- rbind(common_data[common_data$id_cols_diff!=0,names(current_data)],
+      new_data_added<- rbind(common_data[common_data$row_ids_diff!=0,names(current_data)],
                              current_base_data[is.na(current_base_data$source_base) & !is.na(current_base_data$source_current),names(current_data)])
 
       rbind(old_data_updated, new_data_added[, !names(new_data_added) %in% "source_current"])
@@ -333,4 +350,3 @@ scd_type_2_update <-
       base_data
     }
   }
-
