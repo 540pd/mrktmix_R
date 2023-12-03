@@ -350,3 +350,38 @@ scd_type_2_update <-
       base_data
     }
   }
+
+#' Compare Named Vectors
+#'
+#' This function compares two named numeric vectors. It creates a new vector
+#' with names from the base vector and values matched from the comparison vector.
+#' If a name in the base vector does not exist in the comparison vector,
+#' its corresponding value in the output is set to NA.
+#'
+#' @param base_vector A named numeric vector that serves as the base for comparison.
+#' @param comparison_vector A named numeric vector that is compared against the base vector.
+#'
+#' @return A named numeric vector where each element from the base vector is matched
+#'         with the corresponding element in the comparison vector by name.
+#'         If a name from the base vector does not exist in the comparison vector,
+#'         the corresponding value in the returned vector is NA.
+#'
+#' @examples
+#' \dontrun{
+#' base_vector <- c(Alice = 10, Bob = 15, Charlie = 20)
+#' comparison_vector <- c(Alice = 5, David = 18, Bob = 12)
+#' compare_named_vectors(base_vector, comparison_vector)
+#' }
+#'
+compare_named_vectors <- function(base_vector, comparison_vector) {
+  # Create a new vector 'comparison_matched' with names from 'base_vector' and all values as NA
+  comparison_matched <- setNames(rep(NA, length(base_vector)), names(base_vector))
+
+  # Find the matching names between 'base_vector' and 'comparison_vector' for efficient updating
+  matching_names <- names(base_vector) %in% names(comparison_vector)
+
+  # Update 'comparison_matched' only for matching names, avoiding unnecessary operations
+  comparison_matched[matching_names] <- comparison_vector[names(comparison_matched)[matching_names]]
+
+  return(comparison_matched)
+}
