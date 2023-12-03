@@ -34,6 +34,15 @@ summarize_model <- function(model_summary, loop_id) {
     residuals_all = list(residuals(model_summary))
   )
 }
+summarize_model_ <- function(model_summary) {
+  tibble::tibble(
+    sigma = model_summary$sigma,
+    r_squared = model_summary$r.squared,
+    adj_r_squared = model_summary$adj.r.squared,
+    residuals_all = list(residuals(model_summary))
+  )
+}
+
 
 #' Identify the Variable to Drop from a Linear Model
 #'
@@ -101,16 +110,17 @@ identify_drop_variable <-
     coef_df$flag_sum = rowSums(coef_df[, c("flag_pvalue", "flag_sign", "flag_vif")], na.rm = TRUE) != 0
     coef_df$"Pr(>|t|)"[coef_df$type == "intercept"] <-
       coef_df$"Pr(>|t|)"[coef_df$type == "intercept"] - 1
-    coef_df$"Pr(>|t|)" <- round(coef_df$"Pr(>|t|)", pvalue_precision)
+    coef_df$"Pr(>|t|)" <-
+      round(coef_df$"Pr(>|t|)", pvalue_precision)
     if (discard_sign) {
       coef_df$Estimate <- abs(coef_df$Estimate)
     }
     if (highest_estimate) {
-      coef_order <- with(coef_df, order(-flag_sum,-`Pr(>|t|)`,-Estimate))
+      coef_order <- with(coef_df, order(-flag_sum, -`Pr(>|t|)`, -Estimate))
     } else {
-      coef_order <- with(coef_df, order(-flag_sum,-`Pr(>|t|)`, Estimate))
+      coef_order <- with(coef_df, order(-flag_sum, -`Pr(>|t|)`, Estimate))
     }
-    coef_df <- coef_df[coef_order, ]
+    coef_df <- coef_df[coef_order,]
 
     if (sum(coef_df$flag_sum, na.rm = T) ||
         (nrow(coef_df) > run_up_to_flexi_vars)) {
@@ -374,167 +384,140 @@ calculate_vif <- function(model) {
   return(vif_result)
 }
 
-#' Get Base Model After Iteratively Dropping Variables
+#' Iteratively Refine Linear Model by Dropping Variables
 #'
-#' Iteratively updates a linear model by dropping variables based on criteria such as
-#' high p-values, high VIF, and expected sign of coefficients. The process continues
-#' until no more variables meet the criteria for exclusion, refining the model.
+#' This function iteratively updates a linear model by dropping variables based on several
+#' criteria such as expected sign of coefficients, critical p-values, and VIF (Variance
+#' Inflation Factor). Variables are dropped until no more meet the criteria for exclusion,
+#' refining the model at each step.
 #'
-#' @param lm_model A linear model object (of class \code{\link[stats]{lm}}) to be processed.
-#' @param model_data Data used for fitting \code{lm_model}.
-#' @param drop_flexi_vars Logical; specifies the method for handling flexible variables.
-#'   If TRUE, flexible variables are dropped iteratively. If FALSE, independent
-#'   variables are tested only once in the model.
-#' @param independent_var_info A data frame with information about independent
-#'   variables in the model. It should contain columns for variable names, adstock,
-#'   power, lag, and the type of variable (e.g., "flexible", "fixed").
-#' @param run_up_to_flexi_vars Integer indicating the number of "flexible"
-#'   variables to consider for retention (default is 10).
-#' @param drop_pvalue_precision Integer for rounding p-values in the decision
-#'   process (default is 2).
-#' @param discard_estimate_sign Logical; if TRUE, the sign of estimates is
-#'   disregarded in the decision process (default is TRUE).
-#' @param drop_highest_estimate Logical; if TRUE, always drop the variable
-#'   with the highest estimate (default is FALSE).
-#' @param get_model_object Logical; if TRUE, returns the final model object
-#'   (default is FALSE).
-#' @param always_check_vif Logical; if TRUE, the Variance Inflation Factor (VIF)
-#'   is always checked. If FALSE, VIF will only be checked if there are no flags
-#'   for p-value and no signs for the estimate. Default is FALSE.
+#' @param lm_model A linear model object (of class \code{\link[stats]{lm}}).
+#' @param model_data Dataset used for fitting the \code{lm_model}.
+#' @param expected_pos_sign Named numeric vector indicating the expected sign for each variable.
+#' @param critical_pvalue Named numeric vector indicating critical p-value threshold for determining variable significance.
+#' @param critical_vif Named numeric vector indicating critical VIF threshold for assessing multicollinearity.
+#' @param flexi_vars Character vector of variable names considered as flexible in the model.
+#' @param run_up_to_flexi_vars Integer; number of flexible variables to consider for retention.
+#' @param drop_pvalue_precision Integer; number of decimal places to round the p-values to.
+#' @param discard_estimate_sign Logical; if TRUE, the sign of the estimates is disregarded.
+#' @param drop_highest_estimate Logical; if TRUE, the variable with the highest estimate is dropped.
+#' @param defer_intercept_test Logical; if TRUE, the intercept test is deferred.
+#' @param always_check_vif Logical; if TRUE, VIF is always checked.
 #'
-#' @return A list containing the data frame of model coefficients, the data frame
-#'   of model summary statistics, and optionally the final model object if
-#'   \code{get_model_object} is TRUE.
+#' @return A list containing two elements: a list of linear model objects after each iteration
+#'         and a list of VIF values for each iteration.
 #'
 #' @examples
 #' \dontrun{
-#'   advertising <- data.frame(tv = runif(10), radio = runif(10), newspaper = runif(10),
-#'                            sales = runif(10))
-#'   event <- data.frame(event1 = runif(10), event2 = runif(10))
-#'   lm_model <- lm(sales ~ tv + radio + newspaper + event1 + event2, data = cbind(advertising, event))
-#'   independent_var_info <- data.frame(variable = c("tv", "radio", "newspaper", "event1", "event2"),
-#'                                      type = c("fixed", "fixed", "fixed", "flexible", "flexible"),
-#'                                      adstock = rep(NA, 5), power = rep(NA, 5), lag = rep(NA, 5))
-#'   base_model <- get_base_model(lm_model, cbind(advertising, event), independent_var_info,
-#'                                run_up_to_flexi_vars = 10,
-#'                                drop_pvalue_precision = 2, discard_estimate_sign = TRUE,
-#'                                drop_highest_estimate = FALSE, get_model_object = TRUE)
+#'   # Assuming lm_model and model_data are predefined
+#'   expected_pos_sign <- c(var1 = 1, var2 = -1) # Example
+#'   result <- get_base_model(lm_model, model_data, expected_pos_sign, 0.05, 5,
+#'                            c("var1", "var2"), 10, 2, TRUE, FALSE, FALSE, TRUE)
 #' }
-#'
-#' @importFrom dplyr tibble right_join mutate bind_rows
-#' @importFrom tibble rownames_to_column
-#' @importFrom rlang .data
-#'
-get_base_model <-
-  function(lm_model,
-           model_data,
-           independent_var_info,
-           drop_flexi_vars = TRUE,
-           run_up_to_flexi_vars = 10,
-           drop_pvalue_precision = 2,
-           discard_estimate_sign = TRUE,
-           drop_highest_estimate = FALSE,
-           get_model_object = FALSE,
-           always_check_vif = FALSE) {
-    # Cleanse model for singularity and perfect fit
-    lm_model <- cleanse_model_singularity(lm_model,
-                                          model_data,
-                                          independent_var_info$variable[independent_var_info$type == "flexible"],
-                                          round_digits = 2)
-    lm_model <- cleanse_model_perfect_fit(
-      lm_model,
-      model_data,
-      independent_var_info$variable[independent_var_info$type == "flexible"],
-      drop_highest_estimate = FALSE,
-      ignore_estimate_sign = TRUE
-    )
+#' @export
+#' @importFrom stats lm
+#' @importFrom dplyr mutate
+#' @importFrom purrr map
+get_base_model <- function(lm_model,
+                            model_data,
+                            expected_pos_sign,
+                            critical_pvalue,
+                            critical_vif,
+                            flexi_vars,
+                            run_up_to_flexi_vars,
+                            drop_pvalue_precision,
+                            discard_estimate_sign,
+                            drop_highest_estimate,
+                            defer_intercept_test,
+                            always_check_vif) {
+  lm_accumulator <- list()
+  vif_accumulator <- list()
+  # Begin variable dropping loop
+  repeat {
+    lm_accumulator <- c(lm_accumulator, list(lm_model))
 
-    # Initialize loop and data frames to store results
-    loop_id <- 1
-    model_coef_all <- tibble::tibble()
-    model_smry_all <- tibble::tibble()
+    # Get summary of the current model
+    lm_model_smry <- summary(lm_model)
 
-    # Begin variable dropping loop
-    repeat {
-      # Get summary of the current model
-      lm_model_smry <- summary(lm_model)
-      model_coef <- as.data.frame(lm_model_smry$coefficients)
-      model_coef$variable <- gsub("`", "", rownames(model_coef))
-      model_coef <-
-        merge(
-          model_coef,
-          independent_var_info,
-          by = "variable",
-          all.x = T,
-          sort = F
-        )
-      model_coef$loop_id <- loop_id
-      model_coef$flag_pvalue <-
-        model_coef$`Pr(>|t|)` > model_coef$critical_pvalue
-      model_coef$flag_sign <-
-        (model_coef$Estimate > 0) != model_coef$expected_sign
-      if (always_check_vif ||
-          !any(c(model_coef$flag_pvalue, model_coef$flag_sign), na.rm = T)) {
-        model_coef$vif <- calculate_vif(lm_model)
-      } else {
-        model_coef$vif <- NA
-      }
-      model_coef$flag_vif = model_coef$vif > model_coef$critical_vif
-      model_coef <-
-        model_coef[, c(
-          "loop_id",
-          "variable",
-          "type",
-          "adstock",
-          "power",
-          "lag",
-          "sum",
-          "Estimate",
-          "Std. Error",
-          "t value",
-          "Pr(>|t|)",
-          "vif",
-          "flag_pvalue",
-          "flag_sign",
-          "flag_vif"
-        )]
+    model_coef <- lm_model_smry$coefficients
+    rownames(model_coef) <- gsub("`", "", rownames(model_coef))
 
-
-      # Accumulate results
-      model_coef_all <- dplyr::bind_rows(model_coef_all, model_coef)
-      model_smry_all <-
-        dplyr::bind_rows(model_smry_all, summarize_model(lm_model_smry, loop_id))
-
-      # Break loop if no variable is identified to drop
-      if (!drop_flexi_vars) {
-        break
-      }
-
-      # Identify variable to drop based on the current model
-      variable_to_drop <- identify_drop_variable(
+    model_coef <-
+      cbind(
         model_coef,
-        drop_pvalue_precision,
-        discard_estimate_sign,
-        drop_highest_estimate,
-        run_up_to_flexi_vars
+        sign_flag = (model_coef[, 1] > 0) != compare_named_vectors(model_coef[, 1], expected_pos_sign)
       )
-
-      # Break loop if no variable is identified to drop
-      if (is.na(variable_to_drop) || !length(variable_to_drop)) {
-        break
-      }
-
-      # Update loop counter and model
-      loop_id <- loop_id + 1
-      lm_model <- update_model(lm_model, model_data, variable_to_drop)
-    }
-
-    # Return results
-    if (get_model_object) {
-      coef_smry_lm <- list(model_coef_all, model_smry_all, lm_model)
+    model_coef <-
+      cbind(
+        model_coef,
+        pvalue_flag = model_coef[, 4] >= compare_named_vectors(model_coef[, 4], critical_pvalue)
+      )
+    if (always_check_vif ||
+        sum(c(model_coef[,"pvalue_flag"], model_coef[,"sign_flag"]),na.rm=T)==0) {
+      mdl_vif <- calculate_vif(lm_model)
     } else {
-      coef_smry_lm <- list(model_coef_all, model_smry_all, NA)
+      mdl_vif <-
+        setNames(replicate(nrow(model_coef), NA), rownames(model_coef))
+    }
+    vif_accumulator <- c(vif_accumulator, list(mdl_vif))
+    model_coef <- cbind(model_coef, vif_flag = mdl_vif >= compare_named_vectors(mdl_vif, critical_vif))
+
+    model_coef <-
+      cbind(model_coef, flag_sum = rowSums(model_coef[, 5:7], na.rm = T))
+
+    # If sign flag is T, reverse pvalue value flag
+    model_coef[, 6] <- (model_coef[, 5] + model_coef[, 6]) %% 2
+    # If sign flag is T, pvalue = 1- pvalue
+    model_coef[, 4] <-
+      abs(ifelse(is.na(model_coef[, 5]), 0, model_coef[, 5]) - model_coef[, 4])
+    if (defer_intercept_test) {
+      model_coef[rownames(model_coef) %in% "(Intercept)", 4] <-
+        model_coef[rownames(model_coef) %in% "(Intercept)", 4] * (-1)
     }
 
-    return(coef_smry_lm)
+    model_coef <-
+      model_coef[rownames(model_coef) %in% flexi_vars, , drop = FALSE]
+
+    model_coef <-
+      model_coef[order(
+        -model_coef[, "flag_sum"],
+        -model_coef[, "sign_flag"],-round(model_coef[, 4], drop_pvalue_precision),
+        if (discard_estimate_sign &&
+            drop_highest_estimate)
+          - abs(model_coef[, 1])
+        else
+          if (discard_estimate_sign &&
+              !drop_highest_estimate)
+            abs(model_coef[, 1])
+        else
+          if (!discard_estimate_sign &&
+              drop_highest_estimate)
+            - (model_coef[, 1])
+        else
+          if (!discard_estimate_sign &&
+              !drop_highest_estimate)
+            (model_coef[, 1])
+      ), , drop = FALSE]
+
+    variable_to_drop <-
+      rownames(model_coef[model_coef[, "flag_sum"] != 0, , drop = FALSE])[1]
+    if (is.null(variable_to_drop)) {
+      model_coef_flexi_flag <- !is.na(model_coef[, "pvalue_flag", drop = FALSE])
+      if (run_up_to_flexi_vars < sum(model_coef_flexi_flag)) {
+        variable_to_drop <-
+          rownames(model_coef[model_coef_flexi_flag, , drop = FALSE])[1]
+      }
+    }
+
+    # Break loop if no variable is identified to drop
+    if (is.null(variable_to_drop)) {
+      break
+    }
+
+    # Update loop counter and model
+    lm_model <-
+      update_model(lm_model, model_data, variable_to_drop)
   }
+
+  return(list(lm_accumulator, vif_accumulator))
+}
