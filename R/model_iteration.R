@@ -386,7 +386,6 @@ collate_models <-
            get_model_object = FALSE,
            defer_intercept_test=FALSE,
            always_check_vif = FALSE) {
-
     # Dependent Series
     dep_apl_df_list <-
       generate_model_dependent(dep_var_info, model_df, apl_delimiter , var_apl_delimiter)
@@ -480,7 +479,9 @@ collate_models <-
     # Model Parameters
     candidate_variables_df<-dplyr::bind_rows(purrr::map(candidate_variables_list,function(x){
       df<-t(data.frame(x))
-      data.frame(cbind(type.variable=rownames(df)),df, row.names = NULL)}
+      row_names<-unlist(lapply(1:length(x),function(list_id){
+        paste(names(x[list_id]),names(x[[list_id]]),sep=".")}))
+      data.frame(cbind(type.variable=row_names),df, row.names = NULL)}
     ),.id="model_id") %>%
       tidyr::separate(col = .data[["type.variable"]], into = c("type", "variable"),
                sep = "\\.", extra = "merge")
