@@ -107,7 +107,7 @@ identify_drop_variable <-
                                          "flag_pvalue",
                                          "flag_sign",
                                          "flag_vif")]
-    coef_df$flag_sum = rowSums(coef_df[, c("flag_pvalue", "flag_sign", "flag_vif")], na.rm = TRUE) != 0
+    coef_df$flag_sum = rowSums(coef_df[, c("flag_pvalue", "flag_sign", "flag_vif"), drop=FALSE], na.rm = TRUE) != 0
     coef_df$"Pr(>|t|)"[coef_df$type == "intercept"] <-
       coef_df$"Pr(>|t|)"[coef_df$type == "intercept"] - 1
     coef_df$"Pr(>|t|)" <-
@@ -463,7 +463,7 @@ get_base_model <- function(lm_model,
     model_coef <- cbind(model_coef, vif_flag = mdl_vif >= compare_named_vectors(mdl_vif, critical_vif))
 
     model_coef <-
-      cbind(model_coef, flag_sum = rowSums(model_coef[, 5:7], na.rm = T))
+      cbind(model_coef, flag_sum = rowSums(model_coef[, 5:7,drop=FALSE], na.rm = T))
 
     # If sign flag is T, reverse pvalue value flag
     model_coef[, 6] <- (model_coef[, 5] + model_coef[, 6]) %% 2
