@@ -148,6 +148,7 @@ collate_base_models <-
         }), names_to = "loop_id")
       })
       , names_to = "model_id")
+    model_vif$variable<-gsub("`", "", model_vif$variable)
 
     model_vif_with_sign<-merge(model_vif,data.frame(expected_sign=expected_coef_sign),by.x="variable", by.y="row.names", all.x=T)
 
