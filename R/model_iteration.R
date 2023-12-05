@@ -73,7 +73,6 @@ collate_base_models <-
            get_model_object,
            defer_intercept_test,
            always_check_vif) {
-
     base_models <-
       purrr::map2(model_apl_list, independent_variable_info_list, function(model_df_apl,
                                                                            independent_variable_info) {
@@ -81,7 +80,8 @@ collate_base_models <-
           cbind(model_dep_df, model_df_apl)
 
         # flexi variables
-        flexi_vars<-independent_variable_info$variable[independent_variable_info$type == "flexible"]
+        flexi_vars <-
+          independent_variable_info$variable[independent_variable_info$type == "flexible"]
 
         # Fit linear model
         lm_model_formula <-
@@ -142,15 +142,26 @@ collate_base_models <-
     model_vif <-
       purrr::list_rbind(purrr::map(base_models, function(x) {
         purrr::list_rbind(purrr::map(x[[2]], function(y) {
-          data.frame(variable = names(y),
-                     vif = y,
-                     row.names = NULL, check.rows=FALSE, check.names=F)
+          data.frame(
+            variable = names(y),
+            vif = y,
+            row.names = NULL,
+            check.rows = FALSE,
+            check.names = F
+          )
         }), names_to = "loop_id")
       })
       , names_to = "model_id")
-    model_vif$variable<-gsub("`", "", model_vif$variable)
+    model_vif$variable <- gsub("`", "", model_vif$variable)
 
-    model_vif_with_sign<-merge(model_vif,data.frame(expected_sign=expected_coef_sign),by.x="variable", by.y="row.names", all.x=T)
+    model_vif_with_sign <-
+      merge(
+        model_vif,
+        data.frame(expected_sign = expected_coef_sign),
+        by.x = "variable",
+        by.y = "row.names",
+        all.x = T
+      )
 
     model_coef <-
       purrr::list_rbind(purrr::map(base_models, function(x) {
@@ -168,7 +179,8 @@ collate_base_models <-
       model_coef %>%
       dplyr::full_join(model_vif_with_sign, by = c("model_id", "loop_id", "variable")) %>%
       dplyr::left_join(
-        purrr::list_rbind(independent_variable_info_list, names_to = "model_id"),  by = c("model_id", "variable")
+        purrr::list_rbind(independent_variable_info_list, names_to = "model_id"),
+        by = c("model_id", "variable")
       ) %>%
       dplyr::mutate(
         dep_sum = dependent_sum,
@@ -176,28 +188,30 @@ collate_base_models <-
         flag_sign = .data[["expected_sign"]] != (.data[["Estimate"]] > 0),
         flag_vif = .data[["critical_vif"]] <= .data[["vif"]]
       ) %>%
-      dplyr::select(tidyselect::all_of(c(
-        "model_id",
-        "loop_id",
-        "variable",
-        "type",
-        "adstock",
-        "power",
-        "lag",
-        "sum",
-        "Estimate",
-        "Std. Error",
-        "t value",
-        "Pr(>|t|)",
-        "vif",
-        "critical_pvalue",
-        "expected_sign",
-        "critical_vif",
-        "flag_pvalue",
-        "flag_sign",
-        "flag_vif",
-        "dep_sum"
-      )))
+      dplyr::select(tidyselect::all_of(
+        c(
+          "model_id",
+          "loop_id",
+          "variable",
+          "type",
+          "adstock",
+          "power",
+          "lag",
+          "sum",
+          "Estimate",
+          "Std. Error",
+          "t value",
+          "Pr(>|t|)",
+          "vif",
+          "critical_pvalue",
+          "expected_sign",
+          "critical_vif",
+          "flag_pvalue",
+          "flag_sign",
+          "flag_vif",
+          "dep_sum"
+        )
+      ))
 
     if (ncol(base_data)) {
       model_coef_all <- model_coef_all %>%
@@ -223,16 +237,16 @@ collate_base_models <-
     model_smry_all <-
       purrr::list_rbind(purrr::map(base_models, function(x) {
         purrr::list_rbind(purrr::map(x[[1]], function(lm_object) {
-          model_summary<-summary(lm_object)
-          model_residuals<-residuals(model_summary)
+          model_summary <- summary(lm_object)
+          model_residuals <- residuals(model_summary)
           data.frame(
             sigma = model_summary$sigma,
             r_squared = model_summary$r.squared,
             adj_r_squared = model_summary$adj.r.squared,
             residuals = sum(model_residuals),
-            rmse = sqrt(mean(model_residuals^2)),
+            rmse = sqrt(mean(model_residuals ^ 2)),
             mae = mean(abs(model_residuals)),
-            mape = mean(abs(model_residuals)/model_dep_df$Y * 100),
+            mape = mean(abs(model_residuals) / model_dep_df$Y * 100),
             dependent_sum = dependent_sum
           )
 
@@ -240,16 +254,16 @@ collate_base_models <-
       })
       , names_to = "model_id")
 
-    if(get_model_object){
-    lm_model_all <-
-      purrr::list_rbind(purrr::map(base_models, function(x) {
-        purrr::list_rbind(purrr::map(x[[1]], function(y) {
-          tibble(lm_model = list(y))
-        }), names_to = "loop_id")
-      })
-      , names_to = "model_id")
+    if (get_model_object) {
+      lm_model_all <-
+        purrr::list_rbind(purrr::map(base_models, function(x) {
+          purrr::list_rbind(purrr::map(x[[1]], function(y) {
+            tibble(lm_model = list(y))
+          }), names_to = "loop_id")
+        })
+        , names_to = "model_id")
     } else {
-      lm_model_all<-data.frame()
+      lm_model_all <- data.frame()
     }
 
 
@@ -385,7 +399,7 @@ collate_models <-
            drop_discard_estimate_sign = TRUE,
            drop_highest_estimate = FALSE,
            get_model_object = FALSE,
-           defer_intercept_test=FALSE,
+           defer_intercept_test = FALSE,
            always_check_vif = FALSE) {
     # Dependent Series
     dep_apl_df_list <-
@@ -425,10 +439,10 @@ collate_models <-
 
     #Aggregate independent variable
     candidate_variables_list_variable <-
-      unique(unlist(lapply(
-        unname(unlist(candidate_variables_list, recursive = F))
-        , names
-      )))
+      unique(unlist(lapply(unname(
+        unlist(candidate_variables_list, recursive = F)
+      )
+      , names)))
     if (any(!is.na(base_variables))) {
       candidate_variables_list_variable <-
         unique(c(candidate_variables_list_variable, base_variables))
@@ -458,34 +472,46 @@ collate_models <-
 
     candidate_variables_sum <-
       dplyr::bind_rows(purrr::map(model_apl_list, function(model_df_apl) {
-        sum_including_intercept<-c(
-          sapply(model_df_apl, sum, na.rm = TRUE),
-          setNames(nrow(model_df_apl), "(Intercept)")
+        sum_including_intercept <- c(sapply(model_df_apl, sum, na.rm = TRUE),
+                                     setNames(nrow(model_df_apl), "(Intercept)"))
+        data.frame(
+          variable = names(sum_including_intercept),
+          sum = sum_including_intercept,
+          row.names = NULL,
+          check.names = F
         )
-        data.frame(variable =names(sum_including_intercept),sum = sum_including_intercept, row.names =NULL, check.names=F)
-      }), .id ="model_id")
+      }), .id = "model_id")
     candidate_variables_sum$model_id <-
       as.numeric(candidate_variables_sum$model_id)
 
     #expected sign
     expected_sign <-
-      setNames(determine_expected_sign(
-        c(names(model_df_rel), "(Intercept)"),
-        pos_sign_variables,
-        neg_sign_variables,
-        var_agg_delimiter
-      ),c(names(model_df_rel), "(Intercept)"))
+      setNames(
+        determine_expected_sign(
+          c(names(model_df_rel), "(Intercept)"),
+          pos_sign_variables,
+          neg_sign_variables,
+          var_agg_delimiter
+        ),
+        c(names(model_df_rel), "(Intercept)")
+      )
 
 
     # Model Parameters
-    candidate_variables_df<-dplyr::bind_rows(purrr::map(candidate_variables_list,function(x){
-      df<-t(data.frame(x))
-      row_names<-unlist(lapply(1:length(x),function(list_id){
-        paste(names(x[list_id]),names(x[[list_id]]),sep=".")}))
-      data.frame(cbind(type.variable=row_names),df, row.names = NULL)}
-    ),.id="model_id") %>%
-      tidyr::separate(col = .data[["type.variable"]], into = c("type", "variable"),
-               sep = "\\.", extra = "merge")
+    candidate_variables_df <-
+      dplyr::bind_rows(purrr::map(candidate_variables_list, function(x) {
+        df <- t(data.frame(x))
+        row_names <- unlist(lapply(1:length(x), function(list_id) {
+          paste(names(x[list_id]), names(x[[list_id]]), sep = ".")
+        }))
+        data.frame(cbind(type.variable = row_names), df, row.names = NULL)
+      }), .id = "model_id") %>%
+      tidyr::separate(
+        col = .data[["type.variable"]],
+        into = c("type", "variable"),
+        sep = "\\.",
+        extra = "merge"
+      )
     candidate_variables_df$model_id <-
       as.numeric(candidate_variables_df$model_id)
 
@@ -501,7 +527,7 @@ collate_models <-
           row.names = "(Intercept)"
         )
       intercept_df <-
-        intercept_df[rep(1, length(candidate_variables_list)), ]
+        intercept_df[rep(1, length(candidate_variables_list)),]
       intercept_df$model_id <- 1:nrow(intercept_df)
       candidate_variables_df <-
         rbind(candidate_variables_df, intercept_df)
@@ -525,10 +551,10 @@ collate_models <-
       dplyr::ungroup()
     candidate_variables_df$critical_vif <- vif_threshold
     candidate_variables_df$critical_vif[candidate_variables_df$count_fixed_var ==
-                                             1] <- Inf
+                                          1] <- Inf
 
-    candidate_variables_df<-candidate_variables_df %>%
-      left_join(candidate_variables_sum, by = c("model_id","variable"))
+    candidate_variables_df <- candidate_variables_df %>%
+      left_join(candidate_variables_sum, by = c("model_id", "variable"))
 
     candidate_variables_df_list <-
       candidate_variables_df[, c(
@@ -614,7 +640,7 @@ collate_models <-
         values_to = "value"
       ) %>%
       dplyr::mutate(variable = paste(.data[["type"]], .data[["variable_name"]], sep = "_")) %>%
-      dplyr::select(-"type", -"variable_name")
+      dplyr::select(-"type",-"variable_name")
 
     # Pivot wider and prepare for join
     mdl_smry_var_type <- smry_var_type %>%
@@ -622,12 +648,18 @@ collate_models <-
 
     # Summarize contributions and percentages, then pivot longer
     mdl_smry_var <- model_coef_all %>%
-      dplyr::select("dependent_id",
-                    "model_id",
-                    "loop_id",
-                    "variable",
-                    "contri",
-                    "contri_perc") %>%
+      filter(.data$type == "fixed") %>%
+      dplyr::select(
+        "dependent_id",
+        "model_id",
+        "loop_id",
+        "variable",
+        "adstock",
+        "power",
+        "lag",
+        "contri",
+        "contri_perc"
+      ) %>%
       dplyr::group_by(.data$dependent_id,
                       .data$model_id,
                       .data$loop_id,
@@ -635,15 +667,18 @@ collate_models <-
       dplyr::summarise(
         contri = sum(.data$contri),
         contri_perc = sum(.data$contri_perc),
+        adstock = mean(.data$adstock, na.rm = TRUE),
+        power = mean(.data$power, na.rm = TRUE),
+        lag = mean(.data$lag, na.rm = TRUE),
         .groups = "drop"
       ) %>%
       tidyr::pivot_longer(
-        cols = "contri":"contri_perc",
+        cols = c("contri", "contri_perc", "adstock", "power", "lag"),
         names_to = "variable_name",
         values_to = "value"
       ) %>%
       dplyr::mutate(variable_new = paste(.data$variable, .data$variable_name, sep = "_")) %>%
-      dplyr::select(-"variable", -"variable_name")
+      dplyr::select(-"variable",-"variable_name")
 
     # Pivot wider and prepare for join
     mdl_smry_var_wide <- mdl_smry_var %>%
