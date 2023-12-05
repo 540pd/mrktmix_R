@@ -174,7 +174,7 @@ collate_base_models <-
         dep_sum = dependent_sum,
         flag_pvalue = .data[["Pr(>|t|)"]] > .data[["critical_pvalue"]],
         flag_sign = .data[["expected_sign"]] != (.data[["Estimate"]] > 0),
-        flag_vif = .data[["critical_vif"]] > .data[["vif"]]
+        flag_vif = .data[["critical_vif"]] <= .data[["vif"]]
       ) %>%
       dplyr::select(tidyselect::all_of(c(
         "model_id",
