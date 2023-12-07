@@ -550,8 +550,6 @@ collate_models <-
       dplyr::mutate(count_fixed_var = sum(.data$type == "fixed")) %>%
       dplyr::ungroup()
     candidate_variables_df$critical_vif <- vif_threshold
-    candidate_variables_df$critical_vif[candidate_variables_df$count_fixed_var ==
-                                          1] <- Inf
 
     candidate_variables_df <- candidate_variables_df %>%
       left_join(candidate_variables_sum, by = c("model_id", "variable"))
