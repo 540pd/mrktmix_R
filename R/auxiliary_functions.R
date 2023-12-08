@@ -128,10 +128,13 @@ replace_values_pairwise <-
     if (length(conditions_replacements) != length(replacement_values)) {
       stop("Length of conditions_replacements and replacement_values should be the same.")
     }
+    condition_tracker<-replicate(length(input_vector),F)
     for (i in seq_along(conditions_replacements)) {
       condition <- conditions_replacements[i]
       replacement <- replacement_values[i]
-      input_vector[input_vector == condition] <- replacement
+      match_index <- input_vector == condition
+      input_vector[match_index & !condition_tracker] <- replacement
+      condition_tracker[match_index]<-T
     }
     return(input_vector)
   }
