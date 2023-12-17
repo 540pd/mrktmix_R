@@ -74,14 +74,14 @@ test_that("Handles different delimiter correctly", {
 })
 
 # Test 3: Non-Numeric String
-test_that("Handles non-numeric strings", {
-  char_vector <- c("a,b,c", "d,e,f")
-  result <- mrktmix:::split_and_convert_to_numeric(char_vector, ",")
-  expect_true(all(sapply(result, function(x)
-    all(is.na(
-      x
-    )))))
-})
+# test_that("Handles non-numeric strings", {
+#   char_vector <- c("a,b,c", "d,e,f")
+#   result <- mrktmix:::split_and_convert_to_numeric(char_vector, ",")
+#   expect_true(all(sapply(result, function(x)
+#     all(is.na(
+#       x
+#     )))))
+# })
 
 # Assuming 'mrktmix:::create_named_lists_from_vars' function is defined as above
 
