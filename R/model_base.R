@@ -419,17 +419,17 @@ calculate_vif <- function(model) {
 #' @importFrom dplyr mutate
 #' @importFrom purrr map
 get_base_model <- function(lm_model,
-                            model_data,
-                            expected_pos_sign,
-                            critical_pvalue,
-                            critical_vif,
-                            flexi_vars,
-                            run_up_to_flexi_vars,
-                            drop_pvalue_precision,
-                            discard_estimate_sign,
-                            drop_highest_estimate,
-                            defer_intercept_test,
-                            always_check_vif) {
+                           model_data,
+                           expected_pos_sign,
+                           critical_pvalue,
+                           critical_vif,
+                           flexi_vars,
+                           run_up_to_flexi_vars,
+                           drop_pvalue_precision,
+                           discard_estimate_sign,
+                           drop_highest_estimate,
+                           defer_intercept_test,
+                           always_check_vif) {
   lm_accumulator <- list()
   vif_accumulator <- list()
   # Begin variable dropping loop
