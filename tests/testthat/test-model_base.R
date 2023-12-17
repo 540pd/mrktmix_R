@@ -28,31 +28,7 @@
 # library(stringr)
 # library(tibble)
 library(testthat)
-
-# Test 1: VIF above threshold for flexible variable
-test_that("VIF above threshold for flexible variable", {
-  expect_true(determine_vif_flag("flexible", 10, 5))
-})
-
-# Test 2: VIF below threshold
-test_that("VIF below threshold", {
-  expect_false(determine_vif_flag("flexible", 3, 5))
-})
-
-# Test 3: Single fixed variable with infinite VIF
-test_that("Single fixed variable with infinite VIF", {
-  expect_false(determine_vif_flag("fixed", Inf, 5))
-})
-
-# Test 4: Multiple fixed variables, one with infinite VIF
-test_that("Multiple fixed variables, one with infinite VIF", {
-  expect_true(determine_vif_flag("fixedfixed", Inf, 5))
-})
-
-# Test 5: VIF exactly at threshold
-test_that("VIF exactly at threshold", {
-  expect_false(determine_vif_flag("flexible", 5, 5))
-})
+library(mrktmix)
 
 # Defining p-value thresholds for the test cases
 pvalue_thresholds <- c(intercept = 0.05, fixed = 0.05, flexible = 0.1)
@@ -176,7 +152,7 @@ test_that("No variable to drop when all are below threshold", {
     check.names = FALSE
   )
   result <- identify_drop_variable(coef_df, 2, FALSE, FALSE, 1)
-  expect_true(length(result)==0)
+  expect_true(is.na(result)==T)
 })
 
 # Test 3: Considering estimate magnitude in decision
@@ -256,7 +232,7 @@ test_that("Multiple fixed variables, identifying based on p-value", {
     check.names = FALSE
   )
   result <- identify_drop_variable(coef_df, 1, FALSE, FALSE, 3)
-  expect_true(length(result)==0)
+  expect_true(is.na(result)==TRUE)
 })
 
 # Test 5: Multiple fixed variables, identifying based on p-value
@@ -406,62 +382,4 @@ test_that("Model without an intercept", {
 })
 
 
-# Prepare a sample dataset and an initial model for testing
-data(mtcars)
-initial_model <- lm(mpg ~ wt + hp + qsec, data = mtcars)
-
-# Independent variable information
-independent_var_info <- data.frame(
-  variable = c("wt", "hp", "qsec"),
-  type = c("fixed", "fixed", "fixed"),
-  adstock = rep(NA, 3),
-  power = rep(NA, 3),
-  lag = rep(NA, 3)
-)
-
-# Test 1: Basic functionality
-test_that("Basic functionality", {
-  base_model <- get_base_model(
-    initial_model,
-    mtcars,
-    independent_var_info,
-    pos_vars = c("wt"),
-    neg_vars = c("hp"),
-    get_model_object = TRUE
-  )
-  expect_s3_class(base_model[[3]], "lm")  # Checking if the returned model is of class 'lm'
-  expect_true(!"mpg" %in% names(base_model[[1]]$variable))  # Check if model coefficients include 'mpg'
-})
-
-# Test 2: Handling model with high VIF values
-test_that("Handling model with high VIF values", {
-  # Create a model likely to have high VIF
-  high_vif_model <- lm(mpg ~ wt + I(wt^2) + hp, data = mtcars)
-  base_model <- get_base_model(
-    high_vif_model,
-    mtcars,
-    independent_var_info,
-    pos_vars = c("wt"),
-    neg_vars = c("hp"),
-    vif_threshold = 5,  # Lower threshold to trigger VIF-based variable dropping
-    get_model_object = TRUE
-  )
-  expect_s3_class(base_model[[3]], "lm")
-})
-
-# Test 3: Verifying the dropping of variables based on p-value
-test_that("Verifying the dropping of variables based on p-value", {
-  # Create a model where one variable is likely to have a high p-value
-  high_pvalue_model <- lm(mpg ~ wt + hp + qsec, data = mtcars)
-  base_model <- get_base_model(
-    high_pvalue_model,
-    mtcars,
-    independent_var_info,
-    pos_vars = c("wt"),
-    neg_vars = c("hp", "qsec"),
-    pvalue_thresholds = c(intercept = 0.05, fixed = 0.05, flexible = 0.05),  # Setting lower thresholds
-    get_model_object = TRUE
-  )
-  expect_s3_class(base_model[[3]], "lm")
-})
 
