@@ -303,10 +303,38 @@ decompose_model_component <-
 #' `var_info` is a named numeric vector. When `var_info` is a list, the function
 #' generates variable combinations and applies APL transformations to `model_df`.
 #'
-#' @param var_info A named numeric vector or a list detailing the variables and
-#'   their respective APL transformations. The named numeric vector format uses
-#'   `var_apl_delimiter` to separate variable names and APL attributes, while the
-#'   list format provides detailed specifications for each variable.
+#' @param var_info A named numeric vector, character vector, or a list detailing the variables and
+#'   their respective APL transformations. The interpretation of `var_info` depends on its format:
+#'
+#'   - Named Numeric Vector: If `var_info` is a named numeric vector, each named element represents
+#'     a variable to which APL transformations will be applied. The format of each name should be
+#'     "VariableName|Adstock_Power_Lag", where "Adstock", "Power", and "Lag" are numeric values
+#'     separated by `var_apl_delimiter`. Example: "TV|0.8_0.22_0".
+#'
+#'   - Character Vector: If `var_info` is a character vector, it represents one or more variables
+#'     to which APL transformations will be applied. Variables can be specified individually or
+#'     aggregated using `var_agg_delimiter`. Example: "TV" or "TV|Radio".
+#'
+#'   - List: If `var_info` is a list, it should contain detailed specifications for each variable.
+#'     This format allows you to specify APL attributes (Adstock, Power, Lag, Constraints) for each
+#'     variable individually. Example:
+#'     ```
+#'     var_info_list <- list(
+#'       TV = list(
+#'         adstock = setNames(c(.1, .2, .1), c("start", "end", "step")),
+#'         power = setNames(c(.2, .3, .1), c("start", "end", "step")),
+#'         lag = setNames(c(0, 1, 1), c("start", "end", "step")),
+#'         constraints = "adstock <= power"
+#'       ),
+#'       Radio = list(
+#'         adstock = setNames(c(.2, .3, .1), c("start", "end", "step")),
+#'         power = setNames(c(.1, .2, .1), c("start", "end", "step")),
+#'         lag = setNames(c(0, 0, 1), c("start", "end", "step")),
+#'         constraints = "adstock <= power"
+#'       )
+#'     )
+#'     ```
+#'
 #' @param model_df A data frame containing model variables to which the APL
 #'   transformations are to be applied.
 #' @param apl_delimiter Delimiter used for concatenating variable names with
@@ -322,20 +350,47 @@ decompose_model_component <-
 #'
 #' @examples
 #' \dontrun{
-#'   # Named vector input
-#'   var_info_vec <- setNames(5, "TV|0.8_0.22_0")
-#'   result_vec <- generate_model_dependent(var_info_vec, model_df)
+#' # Named vector input with single variable
+#' var_info_vec <- "TV"
+#' result_vec <- generate_model_dependent(var_info_vec, model_df)
 #'
-#'   # List input with APL specifications
-#'   var_info_list <- list(
-#'     TV = list(
-#'       adstock = setNames(c(.1, .2, .1), c("start", "end", "step")),
-#'       power = setNames(c(.2, .3, .1), c("start", "end", "step")),
-#'       lag = setNames(c(0, 1, 1), c("start", "end", "step")),
-#'       constraints = "adstock <= power"
-#'     )
+#' # Named vector input with multiple variables aggregated
+#' var_info_vec <- "TV|Radio"
+#' result_vec <- generate_model_dependent(var_info_vec, model_df)
+#'
+#' var_info_vec <- setNames(5, "TV|0.8_0.22_0")
+#' result_vec <- generate_model_dependent(var_info_vec, model_df)
+#'
+#' var_info_vec <- setNames(c(1,5), c("TV|0.8_0.22_0", "Radio|.3_.2_0"))
+#' result_vec <- generate_model_dependent(var_info_vec, model_df)
+#'
+#' # List input with APL specifications
+#' var_info_list <- list(
+#'   TV = list(
+#'     adstock = setNames(c(.1, .2, .1), c("start", "end", "step")),
+#'     power = setNames(c(.2, .3, .1), c("start", "end", "step")),
+#'     lag = setNames(c(0, 1, 1), c("start", "end", "step")),
+#'     constraints = "adstock <= power"
 #'   )
-#'   result_list <- generate_model_dependent(var_info_list, model_df)
+#' )
+#' result_list <- generate_model_dependent(var_info_list, model_df)
+#'
+#' var_info_list <- list(
+#'   TV = list(
+#'     adstock = setNames(c(.1, .2, .1), c("start", "end", "step")),
+#'     power = setNames(c(.2, .3, .1), c("start", "end", "step")),
+#'     lag = setNames(c(0, 1, 1), c("start", "end", "step")),
+#'     constraints = "adstock <= power"
+#'   ),
+#'   Radio = list(
+#'     adstock = setNames(c(.2, .3, .1), c("start", "end", "step")),
+#'     power = setNames(c(.1, .2, .1), c("start", "end", "step")),
+#'     lag = setNames(c(0, 0, 1), c("start", "end", "step")),
+#'     constraints = "adstock <= power"
+#'   )
+#' )
+#' result_list <- generate_model_dependent(var_info_list, model_df)
+#'
 #' }
 #'
 #' @importFrom purrr map flatten
